@@ -37,7 +37,6 @@ uploads/
 
 # ---- AI model cache ----
 .cache/
-models/
 hf_cache/
 
 # ---- Distribution archives ----
