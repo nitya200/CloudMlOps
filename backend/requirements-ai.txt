@@ -1,0 +1,10 @@
+# AI dependencies, kept separate from requirements.txt because torch is large
+# (~200 MB CPU wheel). The application degrades gracefully to an extractive
+# summarizer when these are not installed, which keeps CI fast.
+#
+# Install with:
+#   pip install -r requirements.txt -r requirements-ai.txt
+
+transformers>=4.46,<5.0
+torch>=2.4,<3.0
+sentencepiece>=0.2,<0.3

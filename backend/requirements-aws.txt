@@ -1,0 +1,8 @@
+# Optional AWS integrations.
+#
+# Only needed when STORAGE_BACKEND=s3. Left out of requirements.txt so local
+# and Docker Compose runs do not pull the SDK they never call.
+#
+#   pip install -r requirements-aws.txt
+
+boto3>=1.35,<2.0

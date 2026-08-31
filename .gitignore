@@ -1,0 +1,52 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+
+# ---- Node / React ----
+node_modules/
+dist/
+dist-ssr/
+*.local
+npm-debug.log*
+yarn-error.log*
+.vite/
+
+# ---- Environment & secrets ----
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ---- Application data ----
+storage/
+uploads/
+*.sqlite
+*.sqlite3
+*.db
+
+# ---- AI model cache ----
+.cache/
+models/
+hf_cache/
+
+# ---- Distribution archives ----
+# Build artifact, regenerated on demand; never a source of truth.
+CloudMLOps.zip
+*.zip
+
+# ---- IDE / OS ----
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
