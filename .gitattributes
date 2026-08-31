@@ -1,0 +1,16 @@
+# Normalize line endings so a Windows checkout still produces working images.
+* text=auto
+
+# Shell scripts must keep LF even on Windows. A CRLF shebang makes the kernel
+# look for an interpreter literally named "/bin/sh\r", and the container fails
+# with the famously misleading "no such file or directory".
+*.sh text eol=lf
+Dockerfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Binary assets git must not touch.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.ico binary

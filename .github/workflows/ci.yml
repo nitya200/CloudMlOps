@@ -1,0 +1,328 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+  workflow_dispatch:
+
+# A new push to the same branch cancels the previous run.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: '3.12'
+  NODE_VERSION: '22'
+
+jobs:
+  backend:
+    name: Backend (lint + tests)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Install dependencies
+        # requirements-ai.txt (torch) is deliberately skipped: the test suite
+        # substitutes a stub summarizer, so pulling a 200 MB wheel would only
+        # slow CI down without testing anything extra.
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint (ruff)
+        run: ruff check .
+
+      - name: Check formatting (ruff format)
+        run: ruff format --check .
+
+      - name: Run tests
+        run: pytest --cov=app --cov-report=term-missing --cov-report=xml
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.xml
+          if-no-files-found: ignore
+
+  backend-integration:
+    name: Backend against PostgreSQL
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: cloudmlops
+          POSTGRES_PASSWORD: cloudmlops
+          POSTGRES_DB: cloudmlops_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cloudmlops"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements*.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      # GitHub Actions does not support YAML anchors, so the environment is
+      # repeated per step rather than shared.
+      - name: Apply migrations to a real PostgreSQL instance
+        env:
+          DATABASE_URL: postgresql+psycopg://cloudmlops:cloudmlops@localhost:5432/cloudmlops_test
+          JWT_SECRET_KEY: ci-only-secret
+          AI_BACKEND: extractive
+          AI_EAGER_LOAD: 'false'
+          SEED_ADMIN: 'false'
+          AUTO_CREATE_SCHEMA: 'false'
+        run: alembic upgrade head
+
+      - name: Write a row into every table
+        # Creating tables proves almost nothing: the enum-case bug created all
+        # seven and then rejected every INSERT. SQLite cannot catch that class
+        # of error because its schema is generated from the same models doing
+        # the writing, so this step exercises real INSERTs on real PostgreSQL.
+        env:
+          DATABASE_URL: postgresql+psycopg://cloudmlops:cloudmlops@localhost:5432/cloudmlops_test
+          JWT_SECRET_KEY: ci-only-secret
+          AI_BACKEND: extractive
+          AI_EAGER_LOAD: 'false'
+          SEED_ADMIN: 'false'
+          AUTO_CREATE_SCHEMA: 'false'
+        run: python -m scripts.verify_postgres
+
+      - name: Verify the migration is reversible
+        env:
+          DATABASE_URL: postgresql+psycopg://cloudmlops:cloudmlops@localhost:5432/cloudmlops_test
+          JWT_SECRET_KEY: ci-only-secret
+          AI_BACKEND: extractive
+          AI_EAGER_LOAD: 'false'
+          SEED_ADMIN: 'false'
+          AUTO_CREATE_SCHEMA: 'false'
+        run: |
+          alembic downgrade base
+          alembic upgrade head
+
+  frontend:
+    name: Frontend (build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production bundle
+        run: npm run build
+
+      - name: Upload bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+          retention-days: 7
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build the backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: false
+          load: false
+          # Torch is skipped so the CI image build stays a few minutes rather
+          # than tens of minutes; the application falls back to the extractive
+          # summarizer when the AI wheels are absent.
+          build-args: |
+            INSTALL_AI=false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build the frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    needs: [backend, backend-integration, frontend, docker]
+    # Only from main and only on a real push, so pull requests and forks can
+    # never reach AWS. Whether the account is configured is checked in the
+    # first step, because secrets are not readable from a job-level `if`.
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: production
+    permissions:
+      id-token: write # OIDC: no long-lived AWS keys in GitHub secrets
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Skip when AWS is not configured
+        id: guard
+        run: |
+          if [ -z "${{ secrets.AWS_ACCOUNT_ID }}" ]; then
+            echo "AWS_ACCOUNT_ID is not set; skipping deployment."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure AWS credentials
+        if: steps.guard.outputs.configured == 'true'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsDeployRole
+          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+
+      - name: Log in to Amazon ECR
+        if: steps.guard.outputs.configured == 'true'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push the backend image
+        if: steps.guard.outputs.configured == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          platforms: linux/amd64
+          # Baking the weights in keeps the first request after a deploy fast.
+          build-args: |
+            INSTALL_AI=true
+            PREFETCH_MODEL=true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/cloudmlops-backend:latest
+            ${{ steps.ecr.outputs.registry }}/cloudmlops-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push the frontend image
+        if: steps.guard.outputs.configured == 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          platforms: linux/amd64
+          build-args: |
+            VITE_API_BASE_URL=${{ vars.BACKEND_PUBLIC_URL }}
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/cloudmlops-frontend:latest
+            ${{ steps.ecr.outputs.registry }}/cloudmlops-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Roll out and wait for the services to stabilise
+        if: steps.guard.outputs.configured == 'true'
+        env:
+          BACKEND_ARN: ${{ secrets.BACKEND_SERVICE_ARN }}
+          FRONTEND_ARN: ${{ secrets.FRONTEND_SERVICE_ARN }}
+        run: |
+          set -euo pipefail
+
+          wait_for() {
+            local arn="$1" name="$2"
+            aws apprunner start-deployment --service-arn "$arn" >/dev/null
+            for attempt in $(seq 1 40); do
+              status=$(aws apprunner describe-service --service-arn "$arn" \
+                --query 'Service.Status' --output text)
+              echo "$name attempt $attempt: $status"
+              case "$status" in
+                RUNNING) return 0 ;;
+                CREATE_FAILED|DELETE_FAILED)
+                  echo "::error::$name entered $status"; return 1 ;;
+              esac
+              sleep 15
+            done
+            echo "::error::$name did not stabilise within 10 minutes"
+            return 1
+          }
+
+          wait_for "$BACKEND_ARN" backend
+          wait_for "$FRONTEND_ARN" frontend
+
+      - name: Smoke test the deployment
+        if: steps.guard.outputs.configured == 'true'
+        run: |
+          set -euo pipefail
+          url="${{ vars.BACKEND_PUBLIC_URL }}/health"
+          body=$(curl -fsS --retry 5 --retry-delay 10 --retry-all-errors "$url")
+          echo "$body"
+          # A 200 is not enough: the service reports "degraded" when it is up
+          # but cannot reach RDS, which is exactly the failure worth catching.
+          echo "$body" | grep -Eq '"status" *: *"ok"' \
+            || { echo "::error::health check did not report status=ok"; exit 1; }
+
+  summary:
+    name: CI result
+    runs-on: ubuntu-latest
+    needs: [backend, backend-integration, frontend, docker]
+    if: always()
+
+    steps:
+      - name: Fail if any job failed
+        run: |
+          echo "backend             : ${{ needs.backend.result }}"
+          echo "backend-integration : ${{ needs.backend-integration.result }}"
+          echo "frontend            : ${{ needs.frontend.result }}"
+          echo "docker              : ${{ needs.docker.result }}"
+          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "::error::One or more CI jobs failed."
+            exit 1
+          fi
+          echo "All checks passed."
