@@ -774,6 +774,7 @@ exercised.
 | [`docs/api-reference.md`](docs/api-reference.md) | Request/response examples and error codes |
 | [`docs/deployment-status.md`](docs/deployment-status.md) | Honest matrix: live demo vs AWS target, AI backend, proposal alignment |
 | [`docs/deployment-render-netlify.md`](docs/deployment-render-netlify.md) | Live Netlify + Render setup, env vars, team issues log |
+| [`docs/team-aws-handoff.md`](docs/team-aws-handoff.md) | Checklist for the teammate with AWS access |
 | [`docs/deployment-aws.md`](docs/deployment-aws.md) | ECR, App Runner, RDS and CloudWatch walkthrough |
 
 ---
