@@ -1,17 +1,33 @@
 # CloudMLOps — AI Document Summarization Platform
 
 A three-tier web application that turns long documents into short, readable summaries.
-Users upload a **PDF, DOCX or TXT** file (or paste raw text), a **FLAN-T5** model produces an
-abstractive summary, and every result is stored in **PostgreSQL** so it can be searched,
-downloaded and rated.
+Users upload a **PDF, DOCX or TXT** file (or paste raw text), an AI backend produces a
+summary (FLAN-T5 abstractive when `transformers`/`torch` are installed, otherwise a
+deterministic extractive fallback), and every result is stored in **PostgreSQL** so it can
+be searched, downloaded and rated.
 
 ```
 React (presentation)  ──►  FastAPI (business)  ──►  PostgreSQL (data)
                                     │
-                                    └──►  FLAN-T5-small (abstractive summarization)
+                                    └──►  FLAN-T5-small (when available) or extractive fallback
 
 Docker  ──►  GitHub Actions  ──►  Amazon ECR  ──►  AWS App Runner  ──►  CloudWatch
+                     │
+                     └──►  (optional $0 demo) Netlify + Render
 ```
+
+### Deployment status (what is live today)
+
+| Path | Status | URL / doc |
+|---|---|---|
+| **Live demo** | Running | Frontend: https://cloudmlops.netlify.app — API: https://cloudmlops.onrender.com |
+| **Render + Netlify** | Documented | [`docs/deployment-render-netlify.md`](docs/deployment-render-netlify.md) |
+| **AWS (App Runner + RDS)** | CI + guide ready; **account not provisioned** | [`docs/deployment-aws.md`](docs/deployment-aws.md) |
+| **FLAN-T5 on live URL** | **No** — extractive fallback on Render free tier | [`docs/deployment-status.md`](docs/deployment-status.md) |
+| **FLAN-T5 locally** | Yes — default `docker compose up --build` | [`The AI tier`](#the-ai-tier) |
+
+See [`docs/deployment-status.md`](docs/deployment-status.md) for the full honest matrix
+(proposal alignment, AI backend, AWS deploy job guard).
 
 | | |
 |---|---|
@@ -28,6 +44,7 @@ Docker  ──►  GitHub Actions  ──►  Amazon ECR  ──►  AWS App Run
 ## Table of contents
 
 - [Quick start](#quick-start)
+- [Deployment](#deployment)
 - [Sharing with another developer](#sharing-with-another-developer)
 - [New here? Read this first](#new-here-read-this-first)
 - [Running without Docker](#running-without-docker)
@@ -75,6 +92,28 @@ starts reuse the cache. Sign in with the administrator account seeded from `.env
 **Want a faster first build?** `INSTALL_AI=false docker compose up --build` skips the ~200 MB
 torch download and runs the extractive fallback summarizer instead (see
 [The AI tier](#the-ai-tier)).
+
+---
+
+## Deployment
+
+Two paths exist. Only one is live today.
+
+| Path | Purpose | Guide |
+|---|---|---|
+| **Render + Netlify** | Zero-cost public demo (current live URLs) | [`docs/deployment-render-netlify.md`](docs/deployment-render-netlify.md) |
+| **AWS App Runner + RDS** | Target production; satisfies “initial AWS deployment” when provisioned | [`docs/deployment-aws.md`](docs/deployment-aws.md) |
+| **Status matrix** | What is implemented vs what is running (AI backend, CI deploy skip, proposal checklist) | [`docs/deployment-status.md`](docs/deployment-status.md) |
+
+The GitHub Actions `deploy` job (OIDC → ECR → App Runner → `/health` smoke test) is
+implemented in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) but **skips itself**
+until the `AWS_ACCOUNT_ID` repository secret is set — see
+[`deployment-aws.md` § Step 9](docs/deployment-aws.md#step-9--turn-on-the-deploy-job).
+
+The live demo on Render runs with `INSTALL_AI=false` and `AI_BACKEND=extractive` because
+the free tier cannot host FLAN-T5 reliably. Abstractive summarization is still implemented
+and runs locally (`docker compose`) and in the AWS deploy build (`INSTALL_AI=true`,
+`PREFETCH_MODEL=true`).
 
 ---
 
@@ -713,7 +752,9 @@ exercised.
 4. **Docker** — builds both images with layer caching.
 5. **Deploy** — on `main` only: pushes both images to ECR over OIDC, rolls out App Runner,
    waits for `RUNNING`, and fails if `/health` does not report `status: "ok"`. Skips
-   itself when `AWS_ACCOUNT_ID` is not configured, so forks are unaffected.
+   itself when `AWS_ACCOUNT_ID` is not configured (the CI summary job prints a reminder).
+   The **live public demo** is on Netlify + Render instead — see
+   [`docs/deployment-render-netlify.md`](docs/deployment-render-netlify.md).
 
 > **Why step 2 writes rows.** Creating tables proves very little. A schema mismatch once
 > created all seven tables and then rejected every `INSERT`, and the SQLite suite could
@@ -731,6 +772,8 @@ exercised.
 | [`docs/use-cases.md`](docs/use-cases.md) | All 16 use cases mapped to endpoints, services and tests |
 | [`docs/design-patterns.md`](docs/design-patterns.md) | Each pattern with the code that implements it |
 | [`docs/api-reference.md`](docs/api-reference.md) | Request/response examples and error codes |
+| [`docs/deployment-status.md`](docs/deployment-status.md) | Honest matrix: live demo vs AWS target, AI backend, proposal alignment |
+| [`docs/deployment-render-netlify.md`](docs/deployment-render-netlify.md) | Live Netlify + Render setup, env vars, team issues log |
 | [`docs/deployment-aws.md`](docs/deployment-aws.md) | ECR, App Runner, RDS and CloudWatch walkthrough |
 
 ---

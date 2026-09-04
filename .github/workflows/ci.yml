@@ -311,18 +311,25 @@ jobs:
   summary:
     name: CI result
     runs-on: ubuntu-latest
-    needs: [backend, backend-integration, frontend, docker]
+    needs: [backend, backend-integration, frontend, docker, deploy]
     if: always()
 
     steps:
-      - name: Fail if any job failed
+      - name: Report job results
         run: |
           echo "backend             : ${{ needs.backend.result }}"
           echo "backend-integration : ${{ needs.backend-integration.result }}"
           echo "frontend            : ${{ needs.frontend.result }}"
           echo "docker              : ${{ needs.docker.result }}"
+          echo "deploy (AWS)        : ${{ needs.deploy.result }}"
+          if [ "${{ needs.deploy.result }}" = "skipped" ]; then
+            echo ""
+            echo "NOTE: AWS deploy was skipped (AWS_ACCOUNT_ID secret not set)."
+            echo "Live demo: Netlify + Render — see docs/deployment-render-netlify.md"
+            echo "To enable AWS: docs/deployment-aws.md § Step 9"
+          fi
           if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
             echo "::error::One or more CI jobs failed."
             exit 1
           fi
-          echo "All checks passed."
+          echo "All required checks passed."

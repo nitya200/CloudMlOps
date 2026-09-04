@@ -177,8 +177,8 @@ export default function Dashboard() {
             {engine?.backend === 'extractive' ? (
               <ErrorMessage
                 variant="warning"
-                title="Running on the extractive fallback"
-                message="transformers and torch are not installed, so summaries are produced by ranking sentences instead of generating new text. Install requirements-ai.txt to enable FLAN-T5."
+                title="Extractive fallback active"
+                message="This environment is not running FLAN-T5 (common on free-tier cloud hosts or when INSTALL_AI=false). Summaries rank existing sentences instead of generating new text. Use docker compose locally or AWS App Runner for abstractive mode — /health reports the active backend."
               />
             ) : (
               <ErrorMessage

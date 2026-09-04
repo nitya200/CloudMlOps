@@ -2,6 +2,11 @@
 
 **Status: the application is deployment-ready; the AWS account is not provisioned yet.**
 
+> **Live demo today** uses **Netlify + Render** (not AWS). See
+> [`deployment-render-netlify.md`](deployment-render-netlify.md) for that path and
+> [`deployment-status.md`](deployment-status.md) for an honest comparison of what is
+> implemented vs what is running (including FLAN-T5 vs extractive on the live URL).
+
 What is already implemented in the repository:
 
 - Alembic migrations, applied automatically by the container entrypoint before uvicorn
