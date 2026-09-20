@@ -1,0 +1,12 @@
+# Copy to terraform.tfvars (gitignored) and adjust.
+
+aws_region          = "us-east-2"
+project_name        = "cloudmlops"
+github_repository   = "nitya200/CloudMlOps"
+db_cluster_identifier = "database-1"
+s3_bucket_name      = "cloudmlops-uploads-569486438576"
+cors_origins        = "https://cloudmlops.netlify.app"
+
+# Set true only on a fresh account with no OIDC provider / IAM roles yet.
+create_github_oidc_provider = false
+create_iam_roles              = false

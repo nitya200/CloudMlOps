@@ -97,23 +97,35 @@ torch download and runs the extractive fallback summarizer instead (see
 
 ## Deployment
 
-Two paths exist. Only one is live today.
+Two paths exist. **Render + Netlify** is the current public demo; **AWS** is the target
+production path for the course proposal (FLAN-T5 on App Runner).
 
 | Path | Purpose | Guide |
 |---|---|---|
-| **Render + Netlify** | Zero-cost public demo (current live URLs) | [`docs/deployment-render-netlify.md`](docs/deployment-render-netlify.md) |
-| **AWS App Runner + RDS** | Target production; satisfies “initial AWS deployment” when provisioned | [`docs/deployment-aws.md`](docs/deployment-aws.md) |
-| **Status matrix** | What is implemented vs what is running (AI backend, CI deploy skip, proposal checklist) | [`docs/deployment-status.md`](docs/deployment-status.md) |
+| **Render + Netlify** | Zero-cost demo (extractive AI on free tier) | [`docs/deployment-render-netlify.md`](docs/deployment-render-netlify.md) |
+| **AWS App Runner + RDS** | Initial AWS deployment with FLAN-T5 | [`docs/deployment-aws.md`](docs/deployment-aws.md), [`infra/README.md`](infra/README.md) |
+| **Resume after a break** | Step-by-step from VPC connector onward | [`docs/aws-resume-checklist.md`](docs/aws-resume-checklist.md) |
+| **Status matrix** | Live vs implemented | [`docs/deployment-status.md`](docs/deployment-status.md) |
 
-The GitHub Actions `deploy` job (OIDC → ECR → App Runner → `/health` smoke test) is
-implemented in [`.github/workflows/ci.yml`](.github/workflows/ci.yml) but **skips itself**
-until the `AWS_ACCOUNT_ID` repository secret is set — see
-[`deployment-aws.md` § Step 9](docs/deployment-aws.md#step-9--turn-on-the-deploy-job).
+### AWS architecture (target)
 
-The live demo on Render runs with `INSTALL_AI=false` and `AI_BACKEND=extractive` because
-the free tier cannot host FLAN-T5 reliably. Abstractive summarization is still implemented
-and runs locally (`docker compose`) and in the AWS deploy build (`INSTALL_AI=true`,
-`PREFETCH_MODEL=true`).
+```
+GitHub Actions (OIDC) → Amazon ECR → App Runner (backend + frontend)
+                                        │
+                                        ├─ VPC connector → Aurora/RDS PostgreSQL
+                                        └─ S3 (uploads) + Secrets Manager
+```
+
+1. **Infrastructure** — `infra/terraform` creates VPC connector + App Runner services
+   (or use Actions → **AWS Infrastructure** workflow).
+2. **Images** — CI `deploy` job on `main` builds with `INSTALL_AI=true`, `PREFETCH_MODEL=true`,
+   pushes to ECR, rolls out App Runner.
+3. **Smoke test** — `/health` must report `status=ok`, `database=connected`, `ai_backend=flan-t5`,
+   `model_loaded=true`. The deploy job **fails** if GitHub production secrets are missing (no silent skip).
+
+Production Docker defaults: `AI_BACKEND=flan-t5`, `AI_EAGER_LOAD=true`, `STORAGE_BACKEND=s3`.
+With `AI_BACKEND=flan-t5`, the app **refuses to start** if transformers/torch or model load fails
+(no silent extractive fallback).
 
 ---
 
@@ -774,6 +786,7 @@ exercised.
 | [`docs/api-reference.md`](docs/api-reference.md) | Request/response examples and error codes |
 | [`docs/deployment-status.md`](docs/deployment-status.md) | Honest matrix: live demo vs AWS target, AI backend, proposal alignment |
 | [`docs/deployment-render-netlify.md`](docs/deployment-render-netlify.md) | Live Netlify + Render setup, env vars, team issues log |
+| [`docs/aws-resume-checklist.md`](docs/aws-resume-checklist.md) | Resume AWS deploy after a break (Steps 6–11 + script) |
 | [`docs/team-aws-handoff.md`](docs/team-aws-handoff.md) | Checklist for the teammate with AWS access |
 | [`docs/deployment-aws.md`](docs/deployment-aws.md) | ECR, App Runner, RDS and CloudWatch walkthrough |
 

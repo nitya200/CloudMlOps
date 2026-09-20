@@ -143,6 +143,14 @@ class Settings(BaseSettings):
             problems.append("STORAGE_BACKEND is 's3' but S3_BUCKET is not set.")
         if any(origin == "*" for origin in self.cors_origin_list):
             problems.append("CORS_ORIGINS must name explicit origins, not '*'.")
+        if self.ai_backend == "flan-t5":
+            from app.ai.model_loader import transformers_available
+
+            if not transformers_available():
+                problems.append(
+                    "AI_BACKEND=flan-t5 but transformers/torch are not installed "
+                    "(build the image with INSTALL_AI=true)."
+                )
         return problems
 
 

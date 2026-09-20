@@ -1,29 +1,40 @@
 # AWS deployment guide
 
-**Status: the application is deployment-ready; the AWS account is not provisioned yet.**
+**Status: application and CI/CD are deployment-ready; App Runner services are not live yet.**
 
 > **Live demo today** uses **Netlify + Render** (not AWS). See
-> [`deployment-render-netlify.md`](deployment-render-netlify.md) for that path and
-> [`deployment-status.md`](deployment-status.md) for an honest comparison of what is
-> implemented vs what is running (including FLAN-T5 vs extractive on the live URL).
+> [`deployment-render-netlify.md`](deployment-render-netlify.md) and
+> [`deployment-status.md`](deployment-status.md).
 
-What is already implemented in the repository:
+> **Resuming after a break?** Use [`aws-resume-checklist.md`](aws-resume-checklist.md) from
+> Step 6 (VPC connector) onward. Account `569486438576`, region **`us-east-2`**.
 
-- Alembic migrations, applied automatically by the container entrypoint before uvicorn
-  starts, with retries while RDS finishes booting.
-- An S3 storage backend (`STORAGE_BACKEND=s3`) so uploads survive redeploys and scale-out.
-- A startup guard that refuses to run in production with insecure defaults.
-- Rate limiting on the credential endpoints.
-- A `deploy` job in `.github/workflows/ci.yml` that authenticates with OIDC, pushes both
-  images to ECR, rolls out App Runner and smoke-tests `/health`.
+## What is implemented in the repo
 
-What remains is account setup: creating the ECR repositories, RDS instance, IAM roles,
-VPC connector and App Runner services described below, then setting the GitHub secrets
-listed in [step 9](#step-9--turn-on-the-deploy-job). The deploy job skips itself until
-`AWS_ACCOUNT_ID` exists, so nothing breaks in the meantime.
+| Component | Location |
+|---|---|
+| Production Docker image (FLAN-T5, S3, migrations) | `backend/Dockerfile` |
+| Refuse startup when `AI_BACKEND=flan-t5` but model/wheels missing | `backend/app/core/config.py`, `main.py` |
+| Terraform for VPC connector + App Runner | [`infra/terraform/`](../infra/terraform/) |
+| CI deploy (OIDC → ECR → App Runner → `/health` smoke test) | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) |
+| One-time infra via GitHub Actions | [`.github/workflows/aws-infra.yml`](../.github/workflows/aws-infra.yml) |
 
-Deliberately out of scope, matching the simplified proposal: Terraform, automated retraining,
-model promotion workflows, DistilBART comparison and blue/green deployment.
+The **`deploy` job on `main` fails** if production GitHub secrets are missing (no silent skip).
+Smoke test requires `ai_backend=flan-t5` and `model_loaded=true`.
+
+## Recommended bootstrap (two phases)
+
+**Phase A — already done in your account (console):** ECR repos, Aurora cluster `database-1`,
+S3 bucket, Secrets Manager (`cloudmlops/*`), IAM roles, GitHub OIDC provider.
+
+**Phase B — from this repo:**
+
+1. Push initial Docker images to ECR (`scripts/aws-resume-deploy.ps1` or local `docker build/push`).
+2. `terraform apply` in `infra/terraform/` **or** GitHub Actions → **AWS Infrastructure** → `apply`.
+3. Copy Terraform outputs into GitHub **production** environment (see [step 9](#step-9--github-production-environment)).
+4. Push to `main` → CI builds with `INSTALL_AI=true`, deploys, smoke-tests `/health`.
+
+See [`infra/README.md`](../infra/README.md) for details.
 
 ---
 
@@ -91,7 +102,7 @@ aws configure                 # or aws sso login
 aws sts get-caller-identity   # confirm the account
 
 export AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-export AWS_REGION=us-east-1
+export AWS_REGION=us-east-2
 ```
 
 ---
@@ -443,22 +454,23 @@ the backend so browser requests are accepted.
 
 ---
 
-## Step 9 — Turn on the deploy job
+## Step 9 — GitHub production environment
 
-The `deploy` job already exists in `.github/workflows/ci.yml`. It runs only on a push to
-`main`, only after `backend`, `backend-integration`, `frontend` and `docker` all pass, and
-**skips itself entirely while `AWS_ACCOUNT_ID` is unset** — so it is inert until you
-complete this step, and stays inert on forks.
+The `deploy` job in `.github/workflows/ci.yml` runs on every push to `main` (after tests pass).
+It **fails immediately** if any required secret or variable is missing — there is no silent skip.
 
-To activate it, add these to the repository's `production` environment:
+Add these to the repository's **`production`** environment (values from `terraform output`):
 
 | Kind | Name | Value |
 |---|---|---|
-| Secret | `AWS_ACCOUNT_ID` | 12-digit account id |
-| Secret | `BACKEND_SERVICE_ARN` | App Runner ARN from step 7 |
-| Secret | `FRONTEND_SERVICE_ARN` | App Runner ARN from step 8 |
-| Variable | `AWS_REGION` | e.g. `us-east-1` (defaults to `us-east-1`) |
-| Variable | `BACKEND_PUBLIC_URL` | `https://<backend-id>.us-east-1.awsapprunner.com` |
+| Secret | `AWS_ACCOUNT_ID` | e.g. `569486438576` |
+| Secret | `BACKEND_SERVICE_ARN` | App Runner backend ARN |
+| Secret | `FRONTEND_SERVICE_ARN` | App Runner frontend ARN |
+| Variable | `AWS_REGION` | `us-east-2` |
+| Variable | `BACKEND_PUBLIC_URL` | `https://<backend-id>.us-east-2.awsapprunner.com` |
+| Variable | `AWS_S3_BUCKET` | `cloudmlops-uploads-<account-id>` (for aws-infra workflow) |
+| Variable | `AWS_DB_CLUSTER_ID` | `database-1` (optional, for aws-infra) |
+| Variable | `CORS_ORIGINS` | Netlify and/or App Runner frontend URL |
 
 Set `BACKEND_PUBLIC_URL` before the first deploy: it is compiled into the frontend bundle
 at build time and is also the URL the smoke test probes.

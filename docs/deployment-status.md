@@ -17,7 +17,8 @@ README diagram alone.
 | **FLAN-T5 abstractive AI** | Yes (`requirements-ai.txt`, `FlanT5Summarizer`) | **No on live demo** | Live `/health` reports `ai_backend: "extractive"` |
 | **Extractive fallback** | Yes | **Yes (live demo)** | Active because Render image was built with `INSTALL_AI=false` |
 | **GitHub Actions CI** | Yes | Runs on every push | Lint, tests, Postgres integration, Docker build |
-| **GitHub Actions deploy** | Yes | **Skipped** | Guard: no `AWS_ACCOUNT_ID` secret |
+| **GitHub Actions deploy** | Yes | **Fails on main if secrets missing** | Requires production env secrets; smoke-tests `flan-t5` |
+| **Terraform (App Runner)** | Yes | **Not applied yet** | `infra/terraform/` |
 
 ---
 

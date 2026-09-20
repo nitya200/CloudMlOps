@@ -184,6 +184,15 @@ class TestProductionSafetyGuard:
 
         assert any("CORS_ORIGINS" in problem for problem in problems)
 
+    def test_rejects_flan_t5_when_ai_wheels_are_absent(self, monkeypatch) -> None:
+        monkeypatch.setattr(
+            "app.ai.model_loader.transformers_available",
+            lambda: False,
+        )
+        problems = self._settings(ai_backend="flan-t5").insecure_production_settings()
+
+        assert any("AI_BACKEND=flan-t5" in problem for problem in problems)
+
     def test_rejects_s3_without_a_bucket(self) -> None:
         problems = self._settings(storage_backend="s3", s3_bucket=None)
 

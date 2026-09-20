@@ -109,6 +109,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 extra={"backend": summarizer.backend, "model": summarizer.model_name},
             )
         except Exception as exc:
+            if settings.is_production and settings.ai_backend == "flan-t5":
+                logger.critical("flan-t5 warm-up failed in production", extra={"error": str(exc)})
+                raise RuntimeError(
+                    "Refusing to start in production: AI_BACKEND=flan-t5 but the model "
+                    "could not be loaded. Build with INSTALL_AI=true and PREFETCH_MODEL=true."
+                ) from exc
             logger.warning("ai warm-up skipped", extra={"error": str(exc)})
 
     yield

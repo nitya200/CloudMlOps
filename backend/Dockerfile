@@ -28,7 +28,7 @@ RUN apt-get update \
 
 # Dependencies are copied and installed first so that source-only changes hit
 # the Docker layer cache instead of reinstalling everything.
-COPY requirements.txt requirements-ai.txt ./
+COPY requirements.txt requirements-ai.txt requirements-aws.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 ARG INSTALL_AI=true
@@ -42,6 +42,9 @@ RUN if [ "$INSTALL_AI" = "true" ]; then \
     else \
       echo "Skipping AI dependencies - the extractive fallback will be used." ; \
     fi
+
+# S3 upload storage on App Runner (requirements-aws.txt is tiny; always installed).
+RUN pip install --no-cache-dir -r requirements-aws.txt
 
 # Run as an unprivileged user.
 RUN useradd --create-home --uid 10001 app \
@@ -71,7 +74,10 @@ ENV STORAGE_DIR=/app/storage \
     LOG_JSON=true \
     PORT=8000 \
     RUN_MIGRATIONS=true \
-    AUTO_CREATE_SCHEMA=false
+    AUTO_CREATE_SCHEMA=false \
+    AI_BACKEND=flan-t5 \
+    AI_EAGER_LOAD=true \
+    STORAGE_BACKEND=s3
 
 EXPOSE 8000
 

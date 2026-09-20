@@ -213,30 +213,36 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Skip when AWS is not configured
-        id: guard
+      - name: Require AWS deployment prerequisites
         run: |
-          if [ -z "${{ secrets.AWS_ACCOUNT_ID }}" ]; then
-            echo "AWS_ACCOUNT_ID is not set; skipping deployment."
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          missing=0
+          check() {
+            if [ -z "$1" ]; then
+              echo "::error::$2 is not set in the production environment."
+              missing=1
+            fi
+          }
+          check "${{ secrets.AWS_ACCOUNT_ID }}" "AWS_ACCOUNT_ID (secret)"
+          check "${{ secrets.BACKEND_SERVICE_ARN }}" "BACKEND_SERVICE_ARN (secret)"
+          check "${{ secrets.FRONTEND_SERVICE_ARN }}" "FRONTEND_SERVICE_ARN (secret)"
+          check "${{ vars.BACKEND_PUBLIC_URL }}" "BACKEND_PUBLIC_URL (variable)"
+          if [ "$missing" -ne 0 ]; then
+            echo "Configure GitHub production environment — see infra/terraform/outputs.tf and docs/deployment-aws.md § Step 9."
+            exit 1
           fi
 
       - name: Configure AWS credentials
-        if: steps.guard.outputs.configured == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsDeployRole
-          aws-region: ${{ vars.AWS_REGION || 'us-east-1' }}
+          aws-region: ${{ vars.AWS_REGION || 'us-east-2' }}
 
       - name: Log in to Amazon ECR
-        if: steps.guard.outputs.configured == 'true'
         id: ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push the backend image
-        if: steps.guard.outputs.configured == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./backend
@@ -253,7 +259,6 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Build and push the frontend image
-        if: steps.guard.outputs.configured == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./frontend
@@ -268,7 +273,6 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Roll out and wait for the services to stabilise
-        if: steps.guard.outputs.configured == 'true'
         env:
           BACKEND_ARN: ${{ secrets.BACKEND_SERVICE_ARN }}
           FRONTEND_ARN: ${{ secrets.FRONTEND_SERVICE_ARN }}
@@ -297,16 +301,21 @@ jobs:
           wait_for "$FRONTEND_ARN" frontend
 
       - name: Smoke test the deployment
-        if: steps.guard.outputs.configured == 'true'
         run: |
           set -euo pipefail
           url="${{ vars.BACKEND_PUBLIC_URL }}/health"
-          body=$(curl -fsS --retry 5 --retry-delay 10 --retry-all-errors "$url")
+          body=$(curl -fsS --retry 8 --retry-delay 15 --retry-all-errors "$url")
           echo "$body"
           # A 200 is not enough: the service reports "degraded" when it is up
           # but cannot reach RDS, which is exactly the failure worth catching.
           echo "$body" | grep -Eq '"status" *: *"ok"' \
             || { echo "::error::health check did not report status=ok"; exit 1; }
+          echo "$body" | grep -Eq '"database" *: *"connected"' \
+            || { echo "::error::health check did not report database=connected"; exit 1; }
+          echo "$body" | grep -Eq '"ai_backend" *: *"flan-t5"' \
+            || { echo "::error::health check did not report ai_backend=flan-t5 (extractive fallback is not allowed in AWS deploy)"; exit 1; }
+          echo "$body" | grep -Eq '"model_loaded" *: *true' \
+            || { echo "::error::FLAN-T5 model is not loaded"; exit 1; }
 
   summary:
     name: CI result
@@ -322,11 +331,11 @@ jobs:
           echo "frontend            : ${{ needs.frontend.result }}"
           echo "docker              : ${{ needs.docker.result }}"
           echo "deploy (AWS)        : ${{ needs.deploy.result }}"
+          if [ "${{ needs.deploy.result }}" = "failure" ]; then
+            echo "AWS deploy failed — check production environment secrets and App Runner logs."
+          fi
           if [ "${{ needs.deploy.result }}" = "skipped" ]; then
-            echo ""
-            echo "NOTE: AWS deploy was skipped (AWS_ACCOUNT_ID secret not set)."
-            echo "Live demo: Netlify + Render — see docs/deployment-render-netlify.md"
-            echo "To enable AWS: docs/deployment-aws.md § Step 9"
+            echo "NOTE: deploy job skipped (not a push to main)."
           fi
           if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
             echo "::error::One or more CI jobs failed."

@@ -1,0 +1,90 @@
+# One-time / occasional AWS infrastructure for CloudMLOps (VPC connector + App Runner).
+#
+# Prerequisites (created manually or already exist):
+#   - ECR repos cloudmlops-backend, cloudmlops-frontend with :latest images pushed
+#   - RDS cluster (database-1), S3 bucket, Secrets Manager secrets cloudmlops/*
+#   - IAM roles AppRunnerECRAccessRole, CloudMLOpsInstanceRole, GitHubActionsDeployRole
+#
+# After apply, copy terraform outputs into GitHub production environment secrets.
+
+name: AWS Infrastructure
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Terraform action"
+        required: true
+        default: "plan"
+        type: choice
+        options:
+          - plan
+          - apply
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  TF_WORKING_DIR: infra/terraform
+
+jobs:
+  terraform:
+    name: Terraform ${{ inputs.action }}
+    runs-on: ubuntu-latest
+    environment: production
+    defaults:
+      run:
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require AWS configuration
+        run: |
+          set -euo pipefail
+          test -n "${{ secrets.AWS_ACCOUNT_ID }}" || {
+            echo "::error::AWS_ACCOUNT_ID secret is required in the production environment."
+            exit 1
+          }
+          test -n "${{ vars.AWS_REGION }}" || echo "AWS_REGION variable not set; Terraform defaults to us-east-2."
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsDeployRole
+          aws-region: ${{ vars.AWS_REGION || 'us-east-2' }}
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.9.0"
+
+      - name: Write terraform.tfvars
+        run: |
+          cat > terraform.tfvars <<EOF
+          aws_region            = "${{ vars.AWS_REGION || 'us-east-2' }}"
+          github_repository     = "${{ github.repository }}"
+          s3_bucket_name        = "${{ vars.AWS_S3_BUCKET }}"
+          db_cluster_identifier = "${{ vars.AWS_DB_CLUSTER_ID || 'database-1' }}"
+          cors_origins          = "${{ vars.CORS_ORIGINS || 'https://cloudmlops.netlify.app' }}"
+          create_github_oidc_provider = false
+          create_iam_roles            = false
+          EOF
+          if [ -z "${{ vars.AWS_S3_BUCKET }}" ]; then
+            echo "::error::Set GitHub variable AWS_S3_BUCKET (e.g. cloudmlops-uploads-ACCOUNT_ID)."
+            exit 1
+          fi
+
+      - run: terraform init -input=false
+
+      - name: Terraform plan
+        if: inputs.action == 'plan'
+        run: terraform plan -input=false
+
+      - name: Terraform apply
+        if: inputs.action == 'apply'
+        run: terraform apply -auto-approve -input=false
+
+      - name: Outputs
+        if: inputs.action == 'apply'
+        run: terraform output -json
