@@ -57,10 +57,12 @@ jobs:
         with:
           context: ./backend
           push: true
+          no-cache: true
           platforms: linux/amd64
           build-args: |
             INSTALL_AI=true
             PREFETCH_MODEL=true
+            GIT_SHA=${{ github.sha }}
           tags: ${{ steps.ecr.outputs.registry }}/cloudmlops-backend:latest
 
       - name: Build and push frontend

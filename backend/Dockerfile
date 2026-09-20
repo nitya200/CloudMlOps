@@ -51,7 +51,9 @@ RUN useradd --create-home --uid 10001 app \
     && mkdir -p /app/storage /home/app/.cache/huggingface \
     && chown -R app:app /app /home/app
 
+ARG GIT_SHA=unknown
 COPY --chown=app:app . .
+RUN echo "git-sha=${GIT_SHA}" > /app/.git-sha
 
 # Git on Windows preserves neither the executable bit nor LF endings, and a
 # CRLF shebang fails as "no such file or directory" because the kernel looks
