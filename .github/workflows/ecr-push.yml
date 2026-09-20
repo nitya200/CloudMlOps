@@ -1,5 +1,9 @@
 # Build and push Docker images to ECR (use when local Docker is unavailable).
 # GitHub → Actions → ECR Push → Run workflow
+#
+# Requires repository secrets (Settings → Secrets and variables → Actions → Secrets):
+#   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY
+# Create keys for IAM user: github-actions-ecr (ECR push policy attached).
 
 name: ECR Push
 
@@ -12,7 +16,6 @@ on:
         default: "https://cloudmlops.onrender.com"
 
 permissions:
-  id-token: write
   contents: read
 
 env:
@@ -26,31 +29,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Require AWS account id
+      - name: Require AWS credentials
         run: |
           set -euo pipefail
-          ACCOUNT="${{ vars.AWS_ACCOUNT_ID || secrets.AWS_ACCOUNT_ID }}"
-          ACCOUNT="${ACCOUNT//[[:space:]]/}"
-          test -n "$ACCOUNT" || {
-            echo "::error::Set repository variable AWS_ACCOUNT_ID=569486438576 (Settings → Secrets and variables → Actions → Variables)."
+          test -n "${{ secrets.AWS_ACCESS_KEY_ID }}" || {
+            echo "::error::Missing repository secret AWS_ACCESS_KEY_ID."
+            echo "Create an access key for IAM user github-actions-ecr and add it under Settings → Secrets and variables → Actions."
             exit 1
           }
-          echo "$ACCOUNT" | grep -Eq '^[0-9]{12}$' || {
-            echo "::error::AWS_ACCOUNT_ID must be exactly 12 digits (got: $ACCOUNT)"
+          test -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" || {
+            echo "::error::Missing repository secret AWS_SECRET_ACCESS_KEY."
             exit 1
           }
-          echo "Using role arn:aws:iam::${ACCOUNT}:role/GitHubActionsDeployRole"
 
-      - name: Configure AWS credentials (OIDC)
-        if: ${{ secrets.AWS_ACCESS_KEY_ID == '' }}
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID || secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsDeployRole
-          aws-region: ${{ env.AWS_REGION }}
-          role-session-name: github-ecr-push-${{ github.run_id }}
-
-      - name: Configure AWS credentials (access keys)
-        if: ${{ secrets.AWS_ACCESS_KEY_ID != '' }}
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
