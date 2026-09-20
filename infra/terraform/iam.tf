@@ -84,7 +84,7 @@ resource "aws_iam_role" "github_deploy" {
           "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
         }
         StringLike = {
-          # Wildcard covers push, workflow_dispatch, and pull_request events.
+          # One claim only — do not also require job_workflow_ref (AND would fail workflow_dispatch).
           "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:*"
         }
       }
