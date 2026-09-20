@@ -1,0 +1,28 @@
+# Delete all GitHub Actions caches for this repo (one-click cleanup).
+# Actions → Cleanup caches → Run workflow
+
+name: Cleanup caches
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  delete-all:
+    name: Delete all Actions caches
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Delete every cache entry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "Deleting all caches for ${GH_REPO}..."
+          gh cache delete --all --succeed-on-no-caches
+          remaining=$(gh cache list --limit 1 --json id --jq 'length')
+          echo "Remaining caches: ${remaining}"
