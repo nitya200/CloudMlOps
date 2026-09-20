@@ -28,16 +28,25 @@ jobs:
 
       - name: Require AWS account id
         run: |
-          test -n "${{ vars.AWS_ACCOUNT_ID || secrets.AWS_ACCOUNT_ID }}" || {
-            echo "::error::Set repository variable or secret AWS_ACCOUNT_ID (e.g. 569486438576)."
+          set -euo pipefail
+          ACCOUNT="${{ vars.AWS_ACCOUNT_ID || secrets.AWS_ACCOUNT_ID }}"
+          ACCOUNT="${ACCOUNT//[[:space:]]/}"
+          test -n "$ACCOUNT" || {
+            echo "::error::Set repository variable AWS_ACCOUNT_ID=569486438576 (Settings → Secrets and variables → Actions → Variables)."
             exit 1
           }
+          echo "$ACCOUNT" | grep -Eq '^[0-9]{12}$' || {
+            echo "::error::AWS_ACCOUNT_ID must be exactly 12 digits (got: $ACCOUNT)"
+            exit 1
+          }
+          echo "Using role arn:aws:iam::${ACCOUNT}:role/GitHubActionsDeployRole"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID || secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsDeployRole
           aws-region: ${{ env.AWS_REGION }}
+          role-session-name: github-ecr-push-${{ github.run_id }}
 
       - uses: aws-actions/amazon-ecr-login@v2
         id: ecr
