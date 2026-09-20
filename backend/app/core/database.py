@@ -38,13 +38,20 @@ def _generate_iam_auth_token(host: str, port: int, username: str) -> str:
     )
 
 
-def build_engine(database_url: str, *, echo: bool = False) -> Engine:
+def build_engine(
+    database_url: str,
+    *,
+    echo: bool = False,
+    poolclass: type | None = None,
+) -> Engine:
     """Create an engine, adapting the pool to the target database.
 
     SQLite is only used by the test suite; it needs a shared in-memory pool and
     the ``check_same_thread`` escape hatch because TestClient uses threads.
     """
     kwargs: dict[str, Any] = {"echo": echo, "future": True}
+    if poolclass is not None:
+        kwargs["poolclass"] = poolclass
     if database_url.startswith("sqlite"):
         kwargs["connect_args"] = {"check_same_thread": False}
         if ":memory:" in database_url:

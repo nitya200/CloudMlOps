@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import pool
 
 from alembic import context
 from app.core.config import settings
@@ -19,8 +19,10 @@ config = context.config
 
 # An explicit URL (set by the test suite, or with `-x`) wins; otherwise fall
 # back to the application settings so the CLI needs no arguments.
+# Alembic loads alembic.ini through ConfigParser, which treats ``%`` as
+# interpolation syntax — percent-encoded passwords (``%21``) must be doubled.
 if not config.get_main_option("sqlalchemy.url", None):
-    config.set_main_option("sqlalchemy.url", settings.database_url)
+    config.set_main_option("sqlalchemy.url", settings.database_url.replace("%", "%%"))
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -46,11 +48,10 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    # Use the application engine so IAM auth tokens and SSL settings match runtime.
+    from app.core.database import build_engine
+
+    connectable = build_engine(_url(), echo=settings.db_echo, poolclass=pool.NullPool)
     with connectable.connect() as connection:
         context.configure(
             connection=connection,
