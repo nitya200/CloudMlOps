@@ -65,7 +65,7 @@ def build_engine(database_url: str, *, echo: bool = False) -> Engine:
         host, port, username = _parse_postgres_url(database_url)
 
         @event.listens_for(engine, "do_connect")
-        def _inject_iam_token(dialect, conn_rec, cargs, cparams) -> None:  # noqa: ARG001
+        def _inject_iam_token(dialect, conn_rec, cargs, cparams) -> None:
             cparams["password"] = _generate_iam_auth_token(host, port, username)
             cparams["sslmode"] = "require"
 
