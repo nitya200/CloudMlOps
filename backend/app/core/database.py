@@ -6,7 +6,7 @@ from collections.abc import Generator
 from typing import Any
 from urllib.parse import urlparse
 
-from sqlalchemy import Engine, create_engine, event
+from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -34,7 +34,13 @@ def _should_use_iam_auth(database_url: str) -> bool:
         return True
     normalized = database_url.replace("postgresql+psycopg://", "postgresql://", 1)
     parsed = urlparse(normalized)
-    return bool(parsed.username and parsed.password is None and parsed.hostname)
+    return bool(parsed.username and not parsed.password and parsed.hostname)
+
+
+def _postgres_dbname(database_url: str) -> str:
+    normalized = database_url.replace("postgresql+psycopg://", "postgresql://", 1)
+    path = urlparse(normalized).path.lstrip("/")
+    return path or "postgres"
 
 
 def _generate_iam_auth_token(host: str, port: int, username: str) -> str:
@@ -75,21 +81,29 @@ def build_engine(
                 max_overflow=10,
                 pool_recycle=1800,
             )
-        if _should_use_iam_auth(database_url):
-            kwargs["connect_args"] = {"sslmode": "require"}
-
-    engine = create_engine(database_url, **kwargs)
 
     if _should_use_iam_auth(database_url):
+        import psycopg
+
         host, port, username = _parse_postgres_url(database_url)
+        dbname = _postgres_dbname(database_url)
 
-        @event.listens_for(engine, "do_connect")
-        def _inject_iam_token(dialect, conn_rec, cargs, cparams) -> None:
-            cparams["password"] = _generate_iam_auth_token(host, port, username)
-            cparams["sslmode"] = "require"
+        def _connect_with_iam_token() -> Any:
+            token = _generate_iam_auth_token(host, port, username)
+            return psycopg.connect(
+                host=host,
+                port=port,
+                user=username,
+                password=token,
+                dbname=dbname,
+                sslmode="require",
+            )
 
+        engine = create_engine("postgresql+psycopg://", creator=_connect_with_iam_token, **kwargs)
         logger.info("database IAM authentication enabled", extra={"host": host, "user": username})
+        return engine
 
+    engine = create_engine(database_url, **kwargs)
     return engine
 
 
