@@ -26,6 +26,17 @@ def _parse_postgres_url(database_url: str) -> tuple[str, int, str]:
     return parsed.hostname, port, parsed.username
 
 
+def _should_use_iam_auth(database_url: str) -> bool:
+    """True when IAM tokens are required (explicit flag or passwordless RDS URL)."""
+    if database_url.startswith("sqlite"):
+        return False
+    if settings.database_iam_auth:
+        return True
+    normalized = database_url.replace("postgresql+psycopg://", "postgresql://", 1)
+    parsed = urlparse(normalized)
+    return bool(parsed.username and parsed.password is None and parsed.hostname)
+
+
 def _generate_iam_auth_token(host: str, port: int, username: str) -> str:
     import boto3
 
@@ -57,18 +68,19 @@ def build_engine(
         if ":memory:" in database_url:
             kwargs["poolclass"] = StaticPool
     else:
-        kwargs.update(
-            pool_pre_ping=True,  # survives RDS idle-connection recycling
-            pool_size=5,
-            max_overflow=10,
-            pool_recycle=1800,
-        )
-        if settings.database_iam_auth:
+        kwargs["pool_pre_ping"] = True
+        if poolclass is None:
+            kwargs.update(
+                pool_size=5,
+                max_overflow=10,
+                pool_recycle=1800,
+            )
+        if _should_use_iam_auth(database_url):
             kwargs["connect_args"] = {"sslmode": "require"}
 
     engine = create_engine(database_url, **kwargs)
 
-    if settings.database_iam_auth and not database_url.startswith("sqlite"):
+    if _should_use_iam_auth(database_url):
         host, port, username = _parse_postgres_url(database_url)
 
         @event.listens_for(engine, "do_connect")
