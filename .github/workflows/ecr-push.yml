@@ -13,7 +13,7 @@ on:
       backend_public_url:
         description: "Backend URL for frontend build (https://....awsapprunner.com)"
         required: false
-        default: "https://cloudmlops.onrender.com"
+        default: "https://p3jivcdmbf.us-east-2.awsapprunner.com"
 
 permissions:
   contents: read

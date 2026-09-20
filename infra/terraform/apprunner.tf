@@ -107,7 +107,8 @@ resource "aws_apprunner_service" "frontend" {
 
   health_check_configuration {
     protocol            = "HTTP"
-    path                = "/health"
+    # Standalone frontend on App Runner has no API upstream; index.html on / is enough.
+    path                = "/"
     interval            = 20
     timeout             = 5
     healthy_threshold   = 1
