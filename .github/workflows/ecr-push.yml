@@ -1,0 +1,64 @@
+# Build and push Docker images to ECR (use when local Docker is unavailable).
+# GitHub → Actions → ECR Push → Run workflow
+
+name: ECR Push
+
+on:
+  workflow_dispatch:
+    inputs:
+      backend_public_url:
+        description: "Backend URL for frontend build (https://....awsapprunner.com)"
+        required: false
+        default: "https://cloudmlops.onrender.com"
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  AWS_REGION: us-east-2
+
+jobs:
+  push:
+    name: Build and push to ECR
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require AWS account id
+        run: |
+          test -n "${{ vars.AWS_ACCOUNT_ID || secrets.AWS_ACCOUNT_ID }}" || {
+            echo "::error::Set repository variable or secret AWS_ACCOUNT_ID (e.g. 569486438576)."
+            exit 1
+          }
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ vars.AWS_ACCOUNT_ID || secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsDeployRole
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+
+      - name: Build and push backend (FLAN-T5)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          platforms: linux/amd64
+          build-args: |
+            INSTALL_AI=true
+            PREFETCH_MODEL=true
+          tags: ${{ steps.ecr.outputs.registry }}/cloudmlops-backend:latest
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          platforms: linux/amd64
+          build-args: |
+            VITE_API_BASE_URL=${{ inputs.backend_public_url }}
+          tags: ${{ steps.ecr.outputs.registry }}/cloudmlops-frontend:latest
