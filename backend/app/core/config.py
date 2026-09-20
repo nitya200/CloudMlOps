@@ -46,6 +46,9 @@ class Settings(BaseSettings):
 
     # ---- Data tier ----
     database_url: str = "postgresql+psycopg://cloudmlops:cloudmlops@localhost:5432/cloudmlops"
+    # Aurora with Internet Access Gateway requires IAM DB auth (password auth is rejected).
+    database_iam_auth: bool = False
+    aws_region: str = "us-east-2"
     db_echo: bool = False
     # create_all on startup keeps the student setup one-command simple; a real
     # production system would run Alembic migrations instead.

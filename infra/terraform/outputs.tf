@@ -22,7 +22,7 @@ output "frontend_service_arn" {
 }
 
 output "vpc_connector_arn" {
-  value = aws_apprunner_vpc_connector.main.arn
+  value = var.enable_vpc_connector ? aws_apprunner_vpc_connector.main[0].arn : null
 }
 
 output "github_actions_role_arn" {

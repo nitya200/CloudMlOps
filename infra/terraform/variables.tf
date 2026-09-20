@@ -55,3 +55,21 @@ variable "create_iam_roles" {
   type        = bool
   default     = false
 }
+
+variable "enable_vpc_connector" {
+  description = "Route App Runner backend egress through a VPC connector (requires RDS in a VPC). Set false when Aurora has VPCNetworkingEnabled=false."
+  type        = bool
+  default     = false
+}
+
+variable "vpc_id" {
+  description = "VPC for the connector when enable_vpc_connector=true and RDS has no subnet group."
+  type        = string
+  default     = ""
+}
+
+variable "vpc_subnet_ids" {
+  description = "Subnets for the connector (at least 2). Defaults to the account default VPC subnets when empty."
+  type        = list(string)
+  default     = []
+}

@@ -28,6 +28,8 @@ resource "aws_apprunner_service" "backend" {
           LOG_LEVEL           = "INFO"
           AUTO_CREATE_SCHEMA  = "false"
           RUN_MIGRATIONS      = "true"
+          DATABASE_IAM_AUTH   = "true"
+          AWS_REGION          = var.aws_region
           AI_BACKEND          = "flan-t5"
           AI_MODEL_NAME       = "google/flan-t5-small"
           AI_EAGER_LOAD       = "true"
@@ -65,10 +67,13 @@ resource "aws_apprunner_service" "backend" {
     unhealthy_threshold = 5
   }
 
-  network_configuration {
-    egress_configuration {
-      egress_type       = "VPC"
-      vpc_connector_arn = aws_apprunner_vpc_connector.main.arn
+  dynamic "network_configuration" {
+    for_each = var.enable_vpc_connector ? [1] : []
+    content {
+      egress_configuration {
+        egress_type       = "VPC"
+        vpc_connector_arn = aws_apprunner_vpc_connector.main[0].arn
+      }
     }
   }
 

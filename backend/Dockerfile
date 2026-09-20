@@ -77,7 +77,8 @@ ENV STORAGE_DIR=/app/storage \
     AUTO_CREATE_SCHEMA=false \
     AI_BACKEND=flan-t5 \
     AI_EAGER_LOAD=true \
-    STORAGE_BACKEND=s3
+    STORAGE_BACKEND=s3 \
+    DATABASE_IAM_AUTH=false
 
 EXPOSE 8000
 

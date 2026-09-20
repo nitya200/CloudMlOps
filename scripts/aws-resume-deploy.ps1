@@ -155,8 +155,8 @@ function Invoke-VpcConnector {
 
 function Invoke-EcrLogin {
     $reg = "$AccountId.dkr.ecr.$Region.amazonaws.com"
-    aws ecr get-login-password --region $Region | docker login --username AWS --password-stdin $reg
-    return $reg
+    aws ecr get-login-password --region $Region | docker login --username AWS --password-stdin $reg 2>&1 | Out-Null
+    Write-Output $reg
 }
 
 function Invoke-PushBackend {

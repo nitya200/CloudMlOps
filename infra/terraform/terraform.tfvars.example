@@ -10,3 +10,6 @@ cors_origins        = "https://cloudmlops.netlify.app"
 # Set true only on a fresh account with no OIDC provider / IAM roles yet.
 create_github_oidc_provider = false
 create_iam_roles              = false
+
+# Aurora database-1 has VPCNetworkingEnabled=false — use public egress until RDS is moved into a VPC.
+enable_vpc_connector = false

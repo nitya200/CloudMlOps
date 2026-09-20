@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from typing import Any
+from urllib.parse import urlparse
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -13,6 +14,28 @@ from app.core.config import settings
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+
+def _parse_postgres_url(database_url: str) -> tuple[str, int, str]:
+    """Extract host, port and username from a PostgreSQL SQLAlchemy URL."""
+    normalized = database_url.replace("postgresql+psycopg://", "postgresql://", 1)
+    parsed = urlparse(normalized)
+    if not parsed.hostname or not parsed.username:
+        raise ValueError("DATABASE_URL must include a hostname and username for IAM auth.")
+    port = parsed.port or 5432
+    return parsed.hostname, port, parsed.username
+
+
+def _generate_iam_auth_token(host: str, port: int, username: str) -> str:
+    import boto3
+
+    region = settings.s3_region or settings.aws_region
+    return boto3.client("rds", region_name=region).generate_db_auth_token(
+        DBHostname=host,
+        Port=port,
+        DBUsername=username,
+        Region=region,
+    )
 
 
 def build_engine(database_url: str, *, echo: bool = False) -> Engine:
@@ -33,7 +56,22 @@ def build_engine(database_url: str, *, echo: bool = False) -> Engine:
             max_overflow=10,
             pool_recycle=1800,
         )
-    return create_engine(database_url, **kwargs)
+        if settings.database_iam_auth:
+            kwargs["connect_args"] = {"sslmode": "require"}
+
+    engine = create_engine(database_url, **kwargs)
+
+    if settings.database_iam_auth and not database_url.startswith("sqlite"):
+        host, port, username = _parse_postgres_url(database_url)
+
+        @event.listens_for(engine, "do_connect")
+        def _inject_iam_token(dialect, conn_rec, cargs, cparams) -> None:  # noqa: ARG001
+            cparams["password"] = _generate_iam_auth_token(host, port, username)
+            cparams["sslmode"] = "require"
+
+        logger.info("database IAM authentication enabled", extra={"host": host, "user": username})
+
+    return engine
 
 
 engine: Engine = build_engine(settings.database_url, echo=settings.db_echo)
