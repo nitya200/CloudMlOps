@@ -69,10 +69,16 @@ export function readError(error, fallback = 'Something went wrong. Please try ag
     }
   }
   if (error?.code === 'ECONNABORTED') {
-    return 'The request timed out. Large documents can take a few minutes to summarize.';
+    return 'The request timed out. Try a shorter document or a shorter summary length.';
   }
   if (error?.message === 'Network Error') {
-    return 'Cannot reach the API. Is the backend running on port 8000?';
+    if (baseURL.includes('awsapprunner.com')) {
+      return 'The request was interrupted (AWS limits responses to 2 minutes). Use a shorter document or try again.';
+    }
+    if (baseURL) {
+      return 'Could not reach the API server. Check your connection and try again.';
+    }
+    return 'Cannot reach the API. For local dev, ensure the backend is running on port 8000.';
   }
   return error?.message || fallback;
 }

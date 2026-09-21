@@ -30,9 +30,11 @@ resource "aws_apprunner_service" "backend" {
           RUN_MIGRATIONS      = "true"
           DATABASE_IAM_AUTH   = "true"
           AWS_REGION          = var.aws_region
-          AI_BACKEND          = "flan-t5"
+          # Extractive summarizer: fast on CPU and stays within App Runner's 120s HTTP limit.
+          # FLAN-T5 remains available locally and in CI Docker builds (INSTALL_AI=true).
+          AI_BACKEND          = "extractive"
           AI_MODEL_NAME       = "google/flan-t5-small"
-          AI_EAGER_LOAD       = "true"
+          AI_EAGER_LOAD       = "false"
           MAX_UPLOAD_SIZE_MB  = "10"
           STORAGE_BACKEND     = "s3"
           S3_BUCKET           = var.s3_bucket_name
