@@ -61,6 +61,14 @@ class Settings(BaseSettings):
     # 12 rounds is the production default; the test suite lowers this so that
     # hashing does not dominate the runtime.
     bcrypt_rounds: int = 12
+    require_email_verification: bool = False
+    email_verification_expire_hours: int = 48
+    public_app_url: str = "http://localhost:5173"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str = "noreply@cloudmlops.app"
 
     # ---- CORS ----
     # Stored as a plain string so pydantic-settings does not attempt JSON decoding

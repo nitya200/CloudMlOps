@@ -34,7 +34,9 @@ from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
 from app.ai.base import SummarizationOutput, Summarizer  # noqa: E402
-from app.ai.factory import set_summarizer  # noqa: E402
+from app.ai import factory as ai_factory  # noqa: E402
+from app.ai.factory import create_summarizer as _create_summarizer_real  # noqa: E402
+from app.ai.factory import get_summarizer, set_summarizer  # noqa: E402
 from app.ai.prompts import SummaryLengthStrategy  # noqa: E402
 from app.core.database import SessionLocal, engine, get_db  # noqa: E402
 from app.core.rate_limit import limiter  # noqa: E402
@@ -100,11 +102,17 @@ def _fresh_database() -> Iterator[None]:
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     set_summarizer(StubSummarizer())
+
+    def _create_summarizer_stub(requested=None):
+        return get_summarizer()
+
+    ai_factory.create_summarizer = _create_summarizer_stub
     # The limiter is process-global; without this, logins from earlier tests
     # would count against later ones and fail them at random.
     limiter.reset()
     yield
     set_summarizer(None)
+    ai_factory.create_summarizer = _create_summarizer_real
     limiter.reset()
     Base.metadata.drop_all(bind=engine)
 

@@ -8,6 +8,7 @@ import uuid
 from sqlalchemy.orm import Session
 
 from app.ai.base import Summarizer
+from app.ai import factory as ai_factory
 from app.ai.factory import get_summarizer
 from app.ai.prompts import SummaryStrategyFactory
 from app.core.exceptions import NotFoundError, ValidationError
@@ -20,6 +21,7 @@ from app.models import (
     Summary,
     SummaryLength,
     SummaryRequest,
+    SummaryStyle,
     User,
 )
 from app.repositories import (
@@ -59,6 +61,7 @@ class SummarizationService:
         *,
         text: str,
         summary_length: SummaryLength = SummaryLength.MEDIUM,
+        summary_style: SummaryStyle = SummaryStyle.CONCISE,
         title: str | None = None,
     ) -> Summary:
         cleaned = self._validate_input(text)
@@ -67,6 +70,7 @@ class SummarizationService:
             document_id=None,
             source_type=SourceType.TEXT,
             summary_length=summary_length,
+            summary_style=summary_style,
             title=(title or self._derive_title(cleaned))[:255],
             input_text=cleaned,
             input_word_count=word_count(cleaned),
@@ -80,6 +84,7 @@ class SummarizationService:
         document_id: uuid.UUID | str,
         *,
         summary_length: SummaryLength = SummaryLength.MEDIUM,
+        summary_style: SummaryStyle = SummaryStyle.CONCISE,
         title: str | None = None,
     ) -> Summary:
         document = self.documents.get_for_user(document_id, user.id)
@@ -91,6 +96,7 @@ class SummarizationService:
             document_id=document.id,
             source_type=SourceType.DOCUMENT,
             summary_length=summary_length,
+            summary_style=summary_style,
             title=(title or document.filename)[:255],
             input_text=cleaned,
             input_word_count=word_count(cleaned),
@@ -133,9 +139,13 @@ class SummarizationService:
     # ---- internals --------------------------------------------------------
     def _run(self, user: User, request: SummaryRequest, metric_type: MetricType) -> Summary:
         strategy = SummaryStrategyFactory.create(request.summary_length)
+        backend = (
+            "flan-t5" if request.summary_style == SummaryStyle.ABSTRACTIVE else "extractive"
+        )
+        summarizer = ai_factory.create_summarizer(backend)
         started = time.perf_counter()
         try:
-            output = self.summarizer.summarize(request.input_text, strategy)
+            output = summarizer.summarize(request.input_text, strategy)
         except Exception as exc:
             elapsed = time.perf_counter() - started
             request.status = RequestStatus.FAILED

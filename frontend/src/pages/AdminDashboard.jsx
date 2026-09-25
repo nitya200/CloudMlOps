@@ -38,6 +38,9 @@ export default function AdminDashboard() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busyUserId, setBusyUserId] = useState(null);
+  const [modelVersions, setModelVersions] = useState([]);
+  const [trainingJobs, setTrainingJobs] = useState([]);
+  const [modelBusy, setModelBusy] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -58,6 +61,15 @@ export default function AdminDashboard() {
     setQuality(qualityData);
   }, []);
 
+  const loadModelLifecycle = useCallback(async () => {
+    const [versions, jobs] = await Promise.all([
+      adminService.modelVersions(),
+      adminService.trainingJobs(),
+    ]);
+    setModelVersions(versions);
+    setTrainingJobs(jobs);
+  }, []);
+
   const loadUsers = useCallback(async () => {
     const response = await adminService.users({
       page,
@@ -70,14 +82,54 @@ export default function AdminDashboard() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    Promise.all([loadMetrics(), loadUsers()])
+    Promise.all([loadMetrics(), loadUsers(), loadModelLifecycle()])
       .then(() => !cancelled && setError(''))
       .catch((requestError) => !cancelled && setError(readError(requestError)))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [loadMetrics, loadUsers]);
+  }, [loadMetrics, loadUsers, loadModelLifecycle]);
+
+  const runEvaluation = async () => {
+    setModelBusy(true);
+    try {
+      await adminService.triggerTrainingJob('Scheduled from admin dashboard');
+      setNotice('Evaluation job finished. Review ROUGE scores and approve the new version.');
+      await loadModelLifecycle();
+      setError('');
+    } catch (requestError) {
+      setError(readError(requestError));
+    } finally {
+      setModelBusy(false);
+    }
+  };
+
+  const approveVersion = async (versionId) => {
+    setModelBusy(true);
+    try {
+      await adminService.approveModelVersion(versionId);
+      setNotice('Model version approved.');
+      await loadModelLifecycle();
+    } catch (requestError) {
+      setError(readError(requestError));
+    } finally {
+      setModelBusy(false);
+    }
+  };
+
+  const promoteVersion = async (versionId) => {
+    setModelBusy(true);
+    try {
+      await adminService.promoteModelVersion(versionId);
+      setNotice('Model version promoted to production.');
+      await loadModelLifecycle();
+    } catch (requestError) {
+      setError(readError(requestError));
+    } finally {
+      setModelBusy(false);
+    }
+  };
 
   const toggleActive = async (target) => {
     setBusyUserId(target.id);
@@ -243,6 +295,93 @@ export default function AdminDashboard() {
           </div>
         </section>
       </div>
+
+      <section className="card mb-2">
+        <div className="card__header">
+          <div className="card__title">
+            <h3>Model lifecycle (UC-12 / UC-16)</h3>
+            <span>Evaluate summarizers with ROUGE, approve, and promote a version</span>
+          </div>
+          <button
+            type="button"
+            className="btn btn--sm btn--brand"
+            disabled={modelBusy}
+            onClick={runEvaluation}
+          >
+            Run evaluation job
+          </button>
+        </div>
+        <div className="table-wrap">
+          <table className="data">
+            <thead>
+              <tr>
+                <th>Version</th>
+                <th>Backend</th>
+                <th>Status</th>
+                <th>ROUGE-L</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {modelVersions.map((row) => (
+                <tr key={row.id}>
+                  <td>
+                    <span className="cell-primary">
+                      <strong>{row.version_label}</strong>
+                      <span>{row.base_model_name}</span>
+                    </span>
+                  </td>
+                  <td>{row.backend}</td>
+                  <td>
+                    <span className={`badge ${row.status === 'active' ? 'badge--success' : ''}`}>
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="text-sm text-muted">
+                    {row.rouge_l != null ? row.rouge_l.toFixed(4) : '—'}
+                  </td>
+                  <td>
+                    <div className="row" style={{ justifyContent: 'flex-end' }}>
+                      {row.status === 'pending_approval' ? (
+                        <button
+                          type="button"
+                          className="btn btn--sm btn--ghost"
+                          disabled={modelBusy}
+                          onClick={() => approveVersion(row.id)}
+                        >
+                          Approve
+                        </button>
+                      ) : null}
+                      {row.status === 'approved' || row.status === 'pending_approval' ? (
+                        <button
+                          type="button"
+                          className="btn btn--sm btn--brand"
+                          disabled={modelBusy}
+                          onClick={() => promoteVersion(row.id)}
+                        >
+                          Promote
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {modelVersions.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="text-center text-muted" style={{ padding: 24 }}>
+                    No model versions registered yet.
+                  </td>
+                </tr>
+              ) : null}
+            </tbody>
+          </table>
+        </div>
+        {trainingJobs[0] ? (
+          <p className="text-sm text-muted" style={{ padding: '0 22px 16px' }}>
+            Latest job: {trainingJobs[0].status} — {trainingJobs[0].progress_message}
+          </p>
+        ) : null}
+      </section>
 
       <section className="card mb-2">
         <div className="card__header">

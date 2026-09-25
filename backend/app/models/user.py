@@ -30,6 +30,7 @@ class User(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         default=UserRole.USER,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
     sessions: Mapped[list[Session]] = relationship(
         back_populates="user", cascade="all, delete-orphan"

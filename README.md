@@ -20,10 +20,11 @@ Docker  ──►  GitHub Actions  ──►  Amazon ECR  ──►  AWS App Run
 
 | Path | Status | URL / doc |
 |---|---|---|
-| **Live demo** | Running | Frontend: https://cloudmlops.netlify.app — API: https://cloudmlops.onrender.com |
+| **AWS production** | **Running** | Frontend: https://asqmhsdwfs.us-east-2.awsapprunner.com — API: https://p3jivcdmbf.us-east-2.awsapprunner.com — Health: https://p3jivcdmbf.us-east-2.awsapprunner.com/health |
+| **Reference demo ($0)** | Optional | Netlify + Render (see docs); **primary demo is AWS below** |
 | **Render + Netlify** | Documented | [`docs/deployment-render-netlify.md`](docs/deployment-render-netlify.md) |
-| **AWS (App Runner + RDS)** | CI + guide ready; **account not provisioned** | [`docs/deployment-aws.md`](docs/deployment-aws.md) |
-| **FLAN-T5 on live URL** | **No** — extractive fallback on Render free tier | [`docs/deployment-status.md`](docs/deployment-status.md) |
+| **AWS (App Runner + RDS)** | Live in `us-east-2` | [`docs/deployment-aws.md`](docs/deployment-aws.md), [`infra/README.md`](infra/README.md) |
+| **AI on AWS / demo** | Extractive (fast, stays within App Runner 120s limit) | [`docs/deployment-status.md`](docs/deployment-status.md) |
 | **FLAN-T5 locally** | Yes — default `docker compose up --build` | [`The AI tier`](#the-ai-tier) |
 
 See [`docs/deployment-status.md`](docs/deployment-status.md) for the full honest matrix
@@ -97,13 +98,14 @@ torch download and runs the extractive fallback summarizer instead (see
 
 ## Deployment
 
-Two paths exist. **Render + Netlify** is the current public demo; **AWS** is the target
-production path for the course proposal (FLAN-T5 on App Runner).
+Two paths are live. **AWS App Runner** is the primary production deployment; **Render +
+Netlify** remains a zero-cost reference demo.
 
-| Path | Purpose | Guide |
+| Path | Purpose | Live URL |
 |---|---|---|
-| **Render + Netlify** | Zero-cost demo (extractive AI on free tier) | [`docs/deployment-render-netlify.md`](docs/deployment-render-netlify.md) |
-| **AWS App Runner + RDS** | Initial AWS deployment with FLAN-T5 | [`docs/deployment-aws.md`](docs/deployment-aws.md), [`infra/README.md`](infra/README.md) |
+| **AWS App Runner + RDS** | Production (`us-east-2`) | https://asqmhsdwfs.us-east-2.awsapprunner.com (UI) · https://p3jivcdmbf.us-east-2.awsapprunner.com (API) |
+| **Render + Netlify** | Zero-cost demo (extractive AI) | https://cloudmlops.netlify.app · https://cloudmlops.onrender.com |
+| **AWS guide** | ECR, Terraform, secrets | [`docs/deployment-aws.md`](docs/deployment-aws.md), [`infra/README.md`](infra/README.md) |
 | **Resume after a break** | Step-by-step from VPC connector onward | [`docs/aws-resume-checklist.md`](docs/aws-resume-checklist.md) |
 | **Status matrix** | Live vs implemented | [`docs/deployment-status.md`](docs/deployment-status.md) |
 
@@ -120,12 +122,12 @@ GitHub Actions (OIDC) → Amazon ECR → App Runner (backend + frontend)
    (or use Actions → **AWS Infrastructure** workflow).
 2. **Images** — CI `deploy` job on `main` builds with `INSTALL_AI=true`, `PREFETCH_MODEL=true`,
    pushes to ECR, rolls out App Runner.
-3. **Smoke test** — `/health` must report `status=ok`, `database=connected`, `ai_backend=flan-t5`,
+3. **Smoke test** — `/health` must report `status=ok`, `database=connected`, and
    `model_loaded=true`. The deploy job **fails** if GitHub production secrets are missing (no silent skip).
 
-Production Docker defaults: `AI_BACKEND=flan-t5`, `AI_EAGER_LOAD=true`, `STORAGE_BACKEND=s3`.
-With `AI_BACKEND=flan-t5`, the app **refuses to start** if transformers/torch or model load fails
-(no silent extractive fallback).
+Production on App Runner uses `AI_BACKEND=extractive` for fast responses within the 120s HTTP
+limit. Docker images still ship with FLAN-T5 (`INSTALL_AI=true`) for local use and future GPU
+deployments. `STORAGE_BACKEND=s3` on AWS.
 
 ---
 
@@ -240,9 +242,10 @@ snippet excludes secrets, virtual environments, and dependency folders:
 # Run from the project root (the folder that contains backend/, frontend/, README.md)
 $root = (Get-Location).Path
 $zipPath = Join-Path $root "CloudMLOps.zip"
-$excludeDirs = @('.git','.venv','venv','node_modules','dist','__pycache__','.pytest_cache',
+$excludeDirs = @('.git','.terraform','.venv','venv','node_modules','dist','__pycache__','.pytest_cache',
                  '.ruff_cache','storage','uploads','hf_cache')
-$excludeFiles = @('.env','CloudMLOps.zip')
+$excludeFiles = @('.env','CloudMLOps.zip','DEPLOYMENT-CREDENTIALS.txt',
+                 'terraform.tfstate','terraform.tfstate.backup','terraform.tfvars')
 
 if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
 Add-Type -AssemblyName System.IO.Compression.FileSystem

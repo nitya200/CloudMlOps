@@ -27,6 +27,7 @@ from app.core.exceptions import AppError
 from app.core.logging import configure_logging, get_logger, request_id_ctx
 from app.schemas.common import ErrorResponse
 from app.services.auth_service import AuthService
+from app.services.model_lifecycle_service import ModelLifecycleService
 
 configure_logging(settings.log_level, settings.log_json)
 logger = get_logger("app.main")
@@ -93,6 +94,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         with SessionLocal() as db:
             AuthService(db).ensure_admin_account()
+            ModelLifecycleService(db).ensure_baseline()
     except Exception as exc:
         logger.error("could not seed administrator", extra={"error": str(exc)})
 

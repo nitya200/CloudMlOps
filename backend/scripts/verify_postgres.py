@@ -26,11 +26,15 @@ from app.models import (
     FeedbackRecord,
     FileType,
     MetricType,
+    ModelVersion,
+    ModelVersionStatus,
     RequestStatus,
     SourceType,
     Summary,
     SummaryLength,
     SummaryRequest,
+    TrainingJob,
+    TrainingJobStatus,
     UsageMetric,
     User,
     UserRole,
@@ -44,6 +48,8 @@ EXPECTED_TABLES = {
     "summaries",
     "feedback_records",
     "usage_metrics",
+    "model_versions",
+    "training_jobs",
 }
 
 
@@ -117,6 +123,25 @@ def check_writes() -> None:
                 success=True,
                 duration_seconds=1.5,
                 attributes={"backend": "flan-t5"},
+            )
+        )
+        version = ModelVersion(
+            version_label=f"ci-{marker}",
+            base_model_name="google/flan-t5-small",
+            backend="flan-t5",
+            status=ModelVersionStatus.ACTIVE,
+            rouge_1=0.42,
+            rouge_2=0.31,
+            rouge_l=0.39,
+        )
+        db.add(version)
+        db.flush()
+        db.add(
+            TrainingJob(
+                status=TrainingJobStatus.COMPLETED,
+                triggered_by_id=user.id,
+                model_version_id=version.id,
+                progress_message="CI smoke test job",
             )
         )
         db.commit()

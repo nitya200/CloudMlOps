@@ -1,10 +1,9 @@
 # AWS deployment guide
 
-**Status: application and CI/CD are deployment-ready; App Runner services are not live yet.**
+**Status: App Runner frontend and backend are live in `us-east-2` (verified via `/health`).**
 
-> **Live demo today** uses **Netlify + Render** (not AWS). See
-> [`deployment-render-netlify.md`](deployment-render-netlify.md) and
-> [`deployment-status.md`](deployment-status.md).
+> Primary demo URLs: see [`deployment-status.md`](deployment-status.md) and the README.
+> Optional zero-cost reference: [`deployment-render-netlify.md`](deployment-render-netlify.md).
 
 > **Resuming after a break?** Use [`aws-resume-checklist.md`](aws-resume-checklist.md) from
 > Step 6 (VPC connector) onward. Account `569486438576`, region **`us-east-2`**.
@@ -20,7 +19,7 @@
 | One-time infra via GitHub Actions | [`.github/workflows/aws-infra.yml`](../.github/workflows/aws-infra.yml) |
 
 The **`deploy` job on `main` fails** if production GitHub secrets are missing (no silent skip).
-Smoke test requires `ai_backend=flan-t5` and `model_loaded=true`.
+Production Terraform sets `AI_BACKEND=extractive` for App Runner’s 120s HTTP limit; smoke tests accept extractive on AWS.
 
 ## Recommended bootstrap (two phases)
 

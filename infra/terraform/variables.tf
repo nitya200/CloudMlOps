@@ -26,6 +26,12 @@ variable "s3_bucket_name" {
   type        = string
 }
 
+variable "enable_cloudwatch_alarms" {
+  description = "Create SNS topic + CloudWatch alarms for App Runner 5xx and health failures."
+  type        = bool
+  default     = true
+}
+
 variable "cors_origins" {
   description = "Comma-separated browser origins allowed to call the API."
   type        = string

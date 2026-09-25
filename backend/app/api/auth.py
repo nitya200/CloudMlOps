@@ -4,11 +4,17 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Query, Request, status
 
 from app.api.deps import CurrentUser, DbSession, client_ip, get_bearer_token, rate_limit
 from app.core.config import settings
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserResponse
+from app.schemas.auth import (
+    LoginRequest,
+    RegisterRequest,
+    RegisterResponse,
+    TokenResponse,
+    UserResponse,
+)
 from app.schemas.common import MessageResponse
 from app.services.auth_service import AuthService
 
@@ -24,7 +30,7 @@ register_throttle = rate_limit(
 
 @router.post(
     "/register",
-    response_model=UserResponse,
+    response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
     summary="Register a new account",
     responses={
@@ -33,12 +39,26 @@ register_throttle = rate_limit(
     },
     dependencies=[Depends(register_throttle)],
 )
-def register(payload: RegisterRequest, db: DbSession) -> UserResponse:
+def register(payload: RegisterRequest, db: DbSession) -> RegisterResponse:
     """Create a standard (non-admin) user account.
 
     Passwords are hashed with bcrypt; the plaintext is never stored or logged.
     """
-    user = AuthService(db).register(payload)
+    user, verification_required, message = AuthService(db).register(payload)
+    return RegisterResponse(
+        user=UserResponse.model_validate(user),
+        verification_required=verification_required,
+        message=message,
+    )
+
+
+@router.get(
+    "/verify-email",
+    response_model=UserResponse,
+    summary="Confirm email ownership (proposal UC-1)",
+)
+def verify_email(db: DbSession, token: str = Query(..., min_length=16)) -> UserResponse:
+    user = AuthService(db).verify_email(token)
     return UserResponse.model_validate(user)
 
 

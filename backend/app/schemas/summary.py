@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from app.models.enums import SourceType, SummaryLength
+from app.models.enums import SourceType, SummaryLength, SummaryStyle
 
 MIN_INPUT_CHARS = 200
 
@@ -21,6 +21,7 @@ class TextSummaryRequest(BaseModel):
         ],
     )
     summary_length: SummaryLength = SummaryLength.MEDIUM
+    summary_style: SummaryStyle = SummaryStyle.CONCISE
     title: str | None = Field(default=None, max_length=255)
 
     @field_validator("text")
@@ -33,6 +34,7 @@ class TextSummaryRequest(BaseModel):
 
 class DocumentSummaryRequest(BaseModel):
     summary_length: SummaryLength = SummaryLength.MEDIUM
+    summary_style: SummaryStyle = SummaryStyle.CONCISE
     title: str | None = Field(default=None, max_length=255)
 
 

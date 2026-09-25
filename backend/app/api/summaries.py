@@ -55,6 +55,7 @@ def summarize_text(
         current_user,
         text=payload.text,
         summary_length=payload.summary_length,
+        summary_style=payload.summary_style,
         title=payload.title,
     )
     return SummaryResponse.model_validate(summary)
@@ -81,6 +82,7 @@ def summarize_document(
         current_user,
         document_id,
         summary_length=payload.summary_length,
+        summary_style=payload.summary_style,
         title=payload.title,
     )
     return SummaryResponse.model_validate(summary)

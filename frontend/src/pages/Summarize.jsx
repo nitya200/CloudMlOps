@@ -19,6 +19,7 @@ export default function Summarize() {
   const [text, setText] = useState('');
   const [file, setFile] = useState(null);
   const [length, setLength] = useState('medium');
+  const [style, setStyle] = useState('concise');
   const [title, setTitle] = useState('');
 
   const [options, setOptions] = useState(null);
@@ -58,6 +59,7 @@ export default function Summarize() {
         const summary = await summaryService.summarizeText({
           text: text.trim(),
           summary_length: length,
+          summary_style: style,
           title: title.trim() || null,
         });
         setResult(summary);
@@ -68,6 +70,7 @@ export default function Summarize() {
         setStatus('generating');
         const summary = await summaryService.summarizeDocument(document.id, {
           summary_length: length,
+          summary_style: style,
           title: title.trim() || document.filename,
         });
         setResult({ ...summary, source_filename: document.filename });
@@ -184,6 +187,29 @@ export default function Summarize() {
             options={options?.lengths}
             disabled={busy}
           />
+
+          <div className="card__title">
+            <h3>Summary style</h3>
+            <span>Concise uses the fast extractive path; Abstractive uses FLAN-T5 when available</span>
+          </div>
+          <div className="segmented" role="group" aria-label="Summary style">
+            <button
+              type="button"
+              aria-pressed={style === 'concise'}
+              onClick={() => setStyle('concise')}
+              disabled={busy}
+            >
+              Concise
+            </button>
+            <button
+              type="button"
+              aria-pressed={style === 'abstractive'}
+              onClick={() => setStyle('abstractive')}
+              disabled={busy}
+            >
+              Abstractive
+            </button>
+          </div>
 
           <div className="field">
             <label htmlFor="summary-title">Title (optional)</label>

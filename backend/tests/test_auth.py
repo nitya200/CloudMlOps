@@ -22,10 +22,12 @@ class TestRegistration:
 
         assert response.status_code == 201
         body = response.json()
-        assert body["email"] == "aakash@example.com"  # normalized to lower case
-        assert body["role"] == "user"
-        assert body["is_active"] is True
-        assert "password" not in body and "password_hash" not in body
+        user = body["user"]
+        assert user["email"] == "aakash@example.com"  # normalized to lower case
+        assert user["role"] == "user"
+        assert user["is_active"] is True
+        assert user["email_verified"] is True
+        assert "password" not in user and "password_hash" not in user
 
     def test_rejects_duplicate_email_case_insensitively(self, client: TestClient) -> None:
         client.post("/api/auth/register", json=REGISTRATION)
@@ -55,7 +57,7 @@ class TestRegistration:
         response = client.post("/api/auth/register", json={**REGISTRATION, "role": "admin"})
 
         assert response.status_code == 201
-        assert response.json()["role"] == "user"
+        assert response.json()["user"]["role"] == "user"
 
 
 class TestLogin:

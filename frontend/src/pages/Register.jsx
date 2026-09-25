@@ -23,6 +23,7 @@ export default function Register() {
 
   const [form, setForm] = useState({ name: '', email: '', password: '', confirm: '' });
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   if (!initializing && isAuthenticated) return <Navigate to="/dashboard" replace />;
@@ -40,6 +41,11 @@ export default function Register() {
     setSubmitting(true);
     const result = await register(form.name.trim(), form.email.trim(), form.password);
     setSubmitting(false);
+    if (result.ok && result.verificationRequired) {
+      setError('');
+      setNotice(result.message || 'Check your email to verify your account, then sign in.');
+      return;
+    }
     if (result.ok) navigate('/dashboard', { replace: true });
     else setError(result.error);
   };
@@ -53,6 +59,11 @@ export default function Register() {
         </div>
 
         <ErrorMessage message={error} onDismiss={() => setError('')} />
+        {notice ? (
+          <p className="field__hint" role="status">
+            {notice}
+          </p>
+        ) : null}
 
         <div className="field">
           <label htmlFor="name">Full name</label>

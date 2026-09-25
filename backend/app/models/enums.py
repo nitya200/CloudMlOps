@@ -16,6 +16,13 @@ class SummaryLength(StrEnum):
     LONG = "long"
 
 
+class SummaryStyle(StrEnum):
+    """User-facing summarization mode (proposal UC-5)."""
+
+    CONCISE = "concise"
+    ABSTRACTIVE = "abstractive"
+
+
 class SourceType(StrEnum):
     """Where the text being summarized came from."""
 
@@ -31,6 +38,23 @@ class FileType(StrEnum):
 
 class RequestStatus(StrEnum):
     PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class ModelVersionStatus(StrEnum):
+    DRAFT = "draft"
+    EVALUATING = "evaluating"
+    PENDING_APPROVAL = "pending_approval"
+    APPROVED = "approved"
+    ACTIVE = "active"
+    RETIRED = "retired"
+    FAILED = "failed"
+
+
+class TrainingJobStatus(StrEnum):
+    QUEUED = "queued"
+    RUNNING = "running"
     COMPLETED = "completed"
     FAILED = "failed"
 

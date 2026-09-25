@@ -66,7 +66,14 @@ export function AuthProvider({ children }) {
   const register = useCallback(
     async (name, email, password) => {
       try {
-        await authService.register({ name, email, password });
+        const data = await authService.register({ name, email, password });
+        if (data.verification_required) {
+          return {
+            ok: true,
+            verificationRequired: true,
+            message: data.message || 'Verify your email before signing in.',
+          };
+        }
         return login(email, password);
       } catch (error) {
         return { ok: false, error: readError(error, 'Unable to create the account.') };

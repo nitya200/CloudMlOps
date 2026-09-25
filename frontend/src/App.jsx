@@ -8,6 +8,7 @@ import History from './pages/History.jsx';
 import Login from './pages/Login.jsx';
 import NotFound from './pages/NotFound.jsx';
 import Register from './pages/Register.jsx';
+import VerifyEmail from './pages/VerifyEmail.jsx';
 import Summarize from './pages/Summarize.jsx';
 import SummaryDetails from './pages/SummaryDetails.jsx';
 
@@ -26,6 +27,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
 
       <Route
         element={

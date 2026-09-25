@@ -48,7 +48,14 @@ class UserResponse(BaseModel):
     email: EmailStr
     role: UserRole
     is_active: bool
+    email_verified: bool = True
     created_at: datetime
+
+
+class RegisterResponse(BaseModel):
+    user: UserResponse
+    verification_required: bool = False
+    message: str | None = None
 
 
 class TokenResponse(BaseModel):

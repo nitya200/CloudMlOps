@@ -1,0 +1,143 @@
+CloudMLOps
+Proposal vs. Implementation — Full Checklist
+Updated September 21, 2026 · [x] done · [~] partial · [ ] not done
+What changed since the last check (Sept 3): real progress. Your GitHub repo (github.com/nitya200/CloudMlOps) now has Terraform-provisioned AWS infrastructure, and I verified it live — https://p3jivcdmbf.us-east-2.awsapprunner.com/health responds with status ok and a connected database, and the frontend (the URL you shared) loads correctly. That moves “initial AWS deployment,” Terraform, and the CD use case from not-done to done. The one place status didn&apos;t improve on paper but got a much better justification: production still runs the extractive summarizer, not FLAN-T5 — but now because AWS App Runner hard-caps HTTP responses at 120 seconds and FLAN-T5&apos;s CPU inference can&apos;t reliably finish long documents inside that window, per the repo&apos;s own Sept 21 commit message. That&apos;s a legitimate engineering tradeoff, not an oversight — say it that way.
+Two things your repo&apos;s own docs no longer agree with each other on, worth resolving before you present: docs/deployment-status.md and the README still describe Netlify + Render as “the live demo” and AWS as “not provisioned” — both are now out of date given what&apos;s actually running. And the earlier note calling Terraform “deliberately out of scope” (docs/deployment-aws.md) is also stale now that Terraform is real and applied. Worth a quick doc pass so a reviewer reading the docs doesn&apos;t get a different story than the live demo.
+Part A — Use Cases (Section 2 of your proposal)
+Overall: 10 done, 4 partial, 2 not done — out of 16.
+End user
+#
+What you proposed
+Status
+Why
+UC-1
+Register for an account with email verification
+[~] PARTIAL
+Registration works (duplicate-email check, bcrypt hash). No verification email or verified flag is sent/stored — login isn&apos;t gated on it.
+UC-2
+Authenticate: login, logout, secure session, role-based access
+[x] DONE
+JWT + revocable session row (logout is real, not just client-side), admin vs. user role enforced on protected routes.
+UC-3
+Submit raw text, receive an abstractive summary
+[~] PARTIAL
+Endpoint works end to end on the live AWS deployment. FLAN-T5 (abstractive) is implemented and tested, but AWS App Runner enforces a 120-second HTTP timeout and FLAN-T5&apos;s CPU inference is too slow for longer documents under that limit — production deliberately runs the extractive summarizer instead (commit “Use fast extractive summarizer on AWS App Runner,” Sept 21).
+UC-4
+Upload a document (PDF/DOCX/TXT); extract and summarize
+[x] DONE
+Upload, extraction (PyMuPDF/python-docx), and summarization pipeline all work end to end.
+UC-5
+Configure summary options (target length; abstractive vs. concise mode)
+[~] PARTIAL
+Length is a per-request user choice (short/medium/long). There&apos;s no separate user-facing “abstractive vs. concise” toggle — backend choice is an environment setting, not something the user picks.
+UC-6
+View, copy, and download a generated summary
+[x] DONE
+SummaryDetails page + /summaries/{id}/download endpoint.
+UC-7
+Browse and search a personal history of past summaries
+[x] DONE
+/api/history supports pagination and a search query across title, summary, and original text.
+UC-8
+Delete or manage saved summaries
+[x] DONE
+DELETE /api/history/{id}, scoped to the owning user.
+UC-9
+Rate summary quality; feedback stored to improve future models
+[x] DONE
+/api/feedback endpoints store ratings. (Nothing yet consumes that feedback to retrain — see UC-16.)
+
+Administrator
+#
+What you proposed
+Status
+Why
+UC-10
+Admin: usage and quality dashboard (volume, latency, ratings)
+[x] DONE
+/api/admin/stats, /usage, /metrics + AdminDashboard.jsx.
+UC-11
+Admin: manage users and roles (activate, deactivate, permissions)
+[x] DONE
+/api/admin/users, /users/{id}/status, /users/{id}/role.
+UC-12
+Admin: review model evaluation metrics, approve/promote a new model version
+[ ] NOT DONE
+No ModelVersion concept anywhere in the schema or API. docs/deployment-aws.md explicitly lists this as descoped “matching the simplified proposal” — confirm that scope cut was actually agreed with your professor.
+
+MLOps pipeline / developer
+#
+What you proposed
+Status
+Why
+UC-13
+CI: lint + unit tests run automatically on every pull request
+[x] DONE
+ci.yml backend job — ruff lint/format + pytest, on every push/PR.
+UC-14
+CD: merge to main builds image, deploys to AWS with zero downtime
+[x] DONE
+Now real: Terraform-provisioned App Runner services (backend + frontend) are live, pulling from ECR, with auto_deployments_enabled and App Runner&apos;s own rolling rollout. Verified live: https://p3jivcdmbf.us-east-2.awsapprunner.com/health responds 200 with a connected database.
+UC-15
+Monitor live service health/logs via CloudWatch; receive failure alerts
+[~] PARTIAL
+App Runner ships logs to CloudWatch automatically, and LOG_JSON=true makes them queryable there — that part is genuinely live now. No CloudWatch alarms/failure alerts are defined in Terraform, so nothing pages anyone yet.
+UC-16
+Trigger a model retraining/fine-tuning job; register the resulting version
+[ ] NOT DONE
+Not built — also explicitly listed as descoped in docs/deployment-aws.md.
+Part B — Technology &amp; Course-Requirement Table (Section 3 of your proposal)
+Overall: 8 done, 3 partial, 0 not done — out of 11.
+#
+What you proposed
+Status
+Why
+1
+Detailed use cases + class &amp; sequence diagrams (UML)
+[x] DONE
+docs/uml-diagrams.md — Mermaid diagrams the repo states are kept in sync with the code.
+2
+12+ non-trivial use cases → 8–10 business-tier classes
+[~] PARTIAL
+16 use cases (exceeds 12+). Only 7 of the 9 named classes exist — ModelVersion and DeploymentJob were never built (tied to UC-12/UC-16).
+3
+At least three tiers
+[x] DONE
+React → FastAPI → PostgreSQL, cleanly separated.
+4
+One or more design patterns + a framework
+[x] DONE
+Exceeds the ask: Repository, two Factory/Strategy pairs (extraction, AI backend + length), plus a Strategy-shaped storage abstraction.
+5
+Global code documentation / published API
+[x] DONE
+Auto-generated OpenAPI, publicly browsable at /docs and /redoc.
+6
+Reasonable data tier following DB design norms
+[x] DONE
+Normalized PostgreSQL schema, UUID PKs, FKs, Alembic-versioned migrations.
+7
+A few unit test cases for the demo
+[x] DONE
+149 test functions — well beyond “a few.”
+8
+Working code maps to class diagrams at demo
+[x] DONE
+Per the repo&apos;s own docs, diagrams are kept matched to source — verify this yourself once before presenting it as fact.
+9
+Containerization, CI/CD &amp; deployment (Docker, ECR, GitHub Actions, App Runner)
+[x] DONE
+No longer just written — it&apos;s running. ECR has real images; App Runner is serving both frontend and backend live in us-east-2, verified by hitting /health directly.
+10
+Infrastructure, monitoring &amp; security (Terraform, CloudWatch, IAM least-privilege)
+[~] PARTIAL
+Reversal from before: Terraform (infra/terraform/) now provisions the real App Runner services, VPC connector, and IAM roles — the earlier “descoped” note is outdated. CloudWatch receives logs automatically; no alarms are defined yet. One inconsistency: a fallback workflow (ecr-push.yml) uses long-lived AWS access keys instead of OIDC — fine as a manual escape hatch, worth knowing if asked about “least privilege” specifically.
+11
+Model &amp; evaluation (HF Transformers, FLAN-T5-small, PyTorch; ROUGE metric vs. DistilBART)
+[~] PARTIAL
+FLAN-T5-small via Transformers/PyTorch is implemented. No ROUGE evaluation code and no DistilBART comparison exist anywhere in the repo; also listed as descoped.
+Reading This at a Glance
+Fully done (10 of 16 use cases; 8 of 11 tech rows): authentication, upload + extraction, generate/view/copy/download a summary, history with search and delete, feedback, the entire admin dashboard, CI linting/testing, the data tier, the design patterns, the documentation/OpenAPI requirement, and now the AWS CD pipeline itself — it&apos;s live, not just written.
+Partially done: abstractive summarization (built and tested, but production runs extractive for the documented App Runner timeout reason above), the abstractive/concise mode toggle (only length is user-configurable), CloudWatch monitoring (logs flow, no alarms yet), and the broader infrastructure/security row (Terraform and IAM roles are real; a static-key fallback workflow is the one loose end).
+Not done: model-version approval and automated retraining (UC-12, UC-16), and the ROUGE/DistilBART evaluation — these are still absent from the codebase and were previously documented as descoped from a “simplified proposal.” Confirm with your professor whether that simplification was ever actually agreed, since the repo can&apos;t tell you that.
+For the Initial Demo checklist itself — authentication, document upload, AI summarization, database integration, initial AWS deployment — 4 of 5 are now solidly done and verified live: authentication, document upload, database (genuinely on AWS RDS now, not just “a Postgres”), and AWS deployment (App Runner, ECR, Terraform, all confirmed reachable). The one remaining asterisk is that the live AI summarizer is extractive, not the abstractive FLAN-T5 the proposal describes — for a real, defensible platform-limit reason, not a shortcut. That&apos;s a strong position to walk into a demo or review with, as long as you say the extractive/AWS-timeout story plainly rather than letting it surface as a surprise.

@@ -9,6 +9,15 @@ export const adminService = {
   stats: () => api.get('/api/admin/stats').then((r) => r.data),
   usage: (days = 14) => api.get('/api/admin/usage', { params: { days } }).then((r) => r.data),
   quality: () => api.get('/api/admin/metrics').then((r) => r.data),
+  modelVersions: () => api.get('/api/admin/model-versions').then((r) => r.data),
+  activeModelVersion: () => api.get('/api/admin/model-versions/active').then((r) => r.data),
+  approveModelVersion: (versionId) =>
+    api.post(`/api/admin/model-versions/${versionId}/approve`).then((r) => r.data),
+  promoteModelVersion: (versionId) =>
+    api.post(`/api/admin/model-versions/${versionId}/promote`).then((r) => r.data),
+  trainingJobs: () => api.get('/api/admin/training-jobs').then((r) => r.data),
+  triggerTrainingJob: (notes) =>
+    api.post('/api/admin/training-jobs', { notes: notes || null }).then((r) => r.data),
 };
 
 export default adminService;

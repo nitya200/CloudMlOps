@@ -9,7 +9,7 @@ from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import GUID, Base, TimestampMixin, UUIDPrimaryKeyMixin, enum_column
-from app.models.enums import RequestStatus, SourceType, SummaryLength
+from app.models.enums import RequestStatus, SourceType, SummaryLength, SummaryStyle
 
 if TYPE_CHECKING:
     from app.models.document import Document
@@ -34,6 +34,11 @@ class SummaryRequest(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         enum_column(SummaryLength, name="summary_length", length=20),
         nullable=False,
         default=SummaryLength.MEDIUM,
+    )
+    summary_style: Mapped[SummaryStyle] = mapped_column(
+        enum_column(SummaryStyle, name="summary_style", length=20),
+        nullable=False,
+        default=SummaryStyle.CONCISE,
     )
     title: Mapped[str] = mapped_column(String(255), nullable=False, default="Untitled")
     input_text: Mapped[str] = mapped_column(Text, nullable=False)

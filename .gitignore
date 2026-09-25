@@ -25,6 +25,7 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+DEPLOYMENT-CREDENTIALS.txt
 *.pem
 *.key
 

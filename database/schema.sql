@@ -139,3 +139,36 @@ CREATE TABLE IF NOT EXISTS usage_metrics (
 
 CREATE INDEX IF NOT EXISTS ix_usage_metrics_user_id     ON usage_metrics (user_id);
 CREATE INDEX IF NOT EXISTS ix_usage_metrics_metric_type ON usage_metrics (metric_type);
+
+-- ---------------------------------------------------------------------------
+-- model_versions: registered summarizer releases with ROUGE metrics (UC-12)
+-- training_jobs: re-evaluation / retraining pipeline triggers (UC-16)
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS model_versions (
+    id               UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    version_label    VARCHAR(64)  NOT NULL UNIQUE,
+    base_model_name  VARCHAR(200) NOT NULL,
+    backend          VARCHAR(32)  NOT NULL,
+    status           VARCHAR(32)  NOT NULL,
+    rouge_1          DOUBLE PRECISION,
+    rouge_2          DOUBLE PRECISION,
+    rouge_l          DOUBLE PRECISION,
+    evaluation_notes TEXT,
+    approved_at      TIMESTAMPTZ,
+    promoted_at      TIMESTAMPTZ,
+    approved_by_id   UUID         REFERENCES users (id) ON DELETE SET NULL,
+    created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS training_jobs (
+    id                UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+    status            VARCHAR(20)  NOT NULL,
+    triggered_by_id   UUID         NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    model_version_id  UUID         REFERENCES model_versions (id) ON DELETE SET NULL,
+    progress_message  VARCHAR(500) NOT NULL DEFAULT '',
+    error_message     VARCHAR(500),
+    finished_at       TIMESTAMPTZ,
+    created_at        TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS ix_training_jobs_model_version_id ON training_jobs (model_version_id);
