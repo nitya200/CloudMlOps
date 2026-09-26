@@ -24,7 +24,7 @@ Docker  ──►  GitHub Actions  ──►  Amazon ECR  ──►  AWS App Run
 | **Reference demo ($0)** | Optional | Netlify + Render (see docs); **primary demo is AWS below** |
 | **Render + Netlify** | Documented | [`docs/deployment-render-netlify.md`](docs/deployment-render-netlify.md) |
 | **AWS (App Runner + RDS)** | Live in `us-east-2` | [`docs/deployment-aws.md`](docs/deployment-aws.md), [`infra/README.md`](infra/README.md) |
-| **AI on AWS / demo** | Extractive (fast, stays within App Runner 120s limit) | [`docs/deployment-status.md`](docs/deployment-status.md) |
+| **AI on AWS** | **FLAN-T5** (check `/health` for `ai_backend`) | [`docs/deployment-status.md`](docs/deployment-status.md) |
 | **FLAN-T5 locally** | Yes — default `docker compose up --build` | [`The AI tier`](#the-ai-tier) |
 
 See [`docs/deployment-status.md`](docs/deployment-status.md) for the full honest matrix
@@ -125,9 +125,8 @@ GitHub Actions (OIDC) → Amazon ECR → App Runner (backend + frontend)
 3. **Smoke test** — `/health` must report `status=ok`, `database=connected`, and
    `model_loaded=true`. The deploy job **fails** if GitHub production secrets are missing (no silent skip).
 
-Production on App Runner uses `AI_BACKEND=extractive` for fast responses within the 120s HTTP
-limit. Docker images still ship with FLAN-T5 (`INSTALL_AI=true`) for local use and future GPU
-deployments. `STORAGE_BACKEND=s3` on AWS.
+Production on App Runner uses `AI_BACKEND=flan-t5` with `AI_EAGER_LOAD=true` (2 vCPU / 4 GB).
+CI builds images with `INSTALL_AI=true` and `PREFETCH_MODEL=true`. `STORAGE_BACKEND=s3` on AWS.
 
 ---
 

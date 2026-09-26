@@ -19,7 +19,7 @@
 | One-time infra via GitHub Actions | [`.github/workflows/aws-infra.yml`](../.github/workflows/aws-infra.yml) |
 
 The **`deploy` job on `main` fails** if production GitHub secrets are missing (no silent skip).
-Production Terraform sets `AI_BACKEND=extractive` for App Runner’s 120s HTTP limit; smoke tests accept extractive on AWS.
+Production Terraform sets `AI_BACKEND=flan-t5` and `AI_EAGER_LOAD=true` (2 vCPU / 4 GB). CI images use `INSTALL_AI=true` and `PREFETCH_MODEL=true`.
 
 ## Recommended bootstrap (two phases)
 

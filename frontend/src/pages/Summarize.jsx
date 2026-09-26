@@ -34,7 +34,12 @@ export default function Summarize() {
   useEffect(() => {
     summaryService
       .options()
-      .then(setOptions)
+      .then((loaded) => {
+        setOptions(loaded);
+        if (loaded?.backend === 'flan-t5' || loaded?.flan_t5_available) {
+          setStyle('abstractive');
+        }
+      })
       .catch(() => setOptions(null));
     summaryService
       .supportedTypes()

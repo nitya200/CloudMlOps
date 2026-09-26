@@ -174,17 +174,23 @@ export default function Dashboard() {
                 <strong>Model</strong> <code>{engine?.model ?? '—'}</code>
               </span>
             </div>
-            {engine?.backend === 'extractive' ? (
-              <ErrorMessage
-                variant="warning"
-                title="Extractive fallback active"
-                message="This environment is not running FLAN-T5 (common on free-tier cloud hosts or when INSTALL_AI=false). Summaries rank existing sentences instead of generating new text. Use docker compose locally or AWS App Runner for abstractive mode — /health reports the active backend."
-              />
-            ) : (
+            {engine?.backend === 'flan-t5' ? (
               <ErrorMessage
                 variant="info"
                 title="Abstractive summarization active"
                 message="FLAN-T5 rewrites the document in its own words. Long documents are summarized in chunks and then merged."
+              />
+            ) : engine?.flan_t5_available ? (
+              <ErrorMessage
+                variant="info"
+                title="FLAN-T5 is installed"
+                message="This host defaults to the fast extractive backend. Open Summarize, choose Abstractive, and generate — that path uses FLAN-T5. To make FLAN-T5 the default everywhere, set AI_BACKEND=flan-t5 on the server and redeploy."
+              />
+            ) : (
+              <ErrorMessage
+                variant="warning"
+                title="Extractive fallback active"
+                message="FLAN-T5 is not available (INSTALL_AI=false, missing torch, or free-tier limits). Summaries rank existing sentences. For the full model locally: docker compose up --build with INSTALL_AI=true. On AWS: redeploy with INSTALL_AI=true and AI_BACKEND=flan-t5."
               />
             )}
             {isAdmin ? (

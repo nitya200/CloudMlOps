@@ -8,6 +8,7 @@ from fastapi import APIRouter, status
 from fastapi.responses import PlainTextResponse
 
 from app.ai.factory import get_summarizer
+from app.ai.model_loader import transformers_available
 from app.ai.prompts import SummaryStrategyFactory
 from app.api.deps import CurrentUser, DbSession
 from app.models import MetricType
@@ -32,6 +33,7 @@ def summary_options() -> dict[str, object]:
         "lengths": SummaryStrategyFactory.available(),
         "backend": summarizer.backend,
         "model": summarizer.model_name,
+        "flan_t5_available": transformers_available(),
     }
 
 

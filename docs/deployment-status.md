@@ -9,11 +9,11 @@ repository**.
 
 | Concern | In code / CI | Live today | Notes |
 |---|---|---|---|
-| **AWS production (frontend)** | Yes | https://asqmhsdwfs.us-east-2.awsapprunner.com | App Runner + ECR |
-| **AWS production (API)** | Yes | https://p3jivcdmbf.us-east-2.awsapprunner.com | RDS PostgreSQL, S3 uploads |
+| **AWS production (frontend)** | Yes | **https://asqmhsdwfs.us-east-2.awsapprunner.com** | App Runner + ECR — primary live UI |
+| **AWS production (API)** | Yes | **https://p3jivcdmbf.us-east-2.awsapprunner.com** | RDS PostgreSQL, S3 uploads |
 | **Reference demo (frontend)** | Yes | https://cloudmlops.netlify.app | Zero-cost Netlify |
 | **Reference demo (API)** | Yes | https://cloudmlops.onrender.com | Render free tier |
-| **AI on AWS** | Yes | **Extractive** (fast; App Runner 120s HTTP limit) | FLAN-T5 in image for local/GPU |
+| **AI on AWS** | Yes | **FLAN-T5** (`AI_BACKEND=flan-t5`, 2 vCPU / 4 GB) | Verify via `/health` |
 | **FLAN-T5 abstractive AI** | Yes | Local Docker + optional AWS GPU path | `backend/app/ai/flan_t5.py` |
 | **Model registry / retraining (UC-12, UC-16)** | Yes | API + admin UI | ROUGE evaluation, approve, promote |
 | **GitHub Actions CI** | Yes | Every push/PR | Lint, tests, Postgres integration, Docker |
