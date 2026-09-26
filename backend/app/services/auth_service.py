@@ -19,9 +19,9 @@ from app.core.security import (
     verify_password,
 )
 from app.models import EmailVerificationToken, MetricType, User, UserRole
-from app.services.email_service import send_verification_email
 from app.repositories import MetricRepository, SessionRepository, UserRepository
 from app.schemas.auth import LoginRequest, RegisterRequest
+from app.services.email_service import send_verification_email
 
 logger = get_logger(__name__)
 
@@ -58,9 +58,7 @@ class AuthService:
             token_hash = hashlib.sha256(raw.encode()).hexdigest()
             expires = datetime.now(UTC) + timedelta(hours=settings.email_verification_expire_hours)
             self.db.add(
-                EmailVerificationToken(
-                    user_id=user.id, token_hash=token_hash, expires_at=expires
-                )
+                EmailVerificationToken(user_id=user.id, token_hash=token_hash, expires_at=expires)
             )
             verify_url = f"{settings.public_app_url.rstrip('/')}/verify-email?token={raw}"
             send_verification_email(to_email=user.email, verify_url=verify_url)
@@ -81,7 +79,9 @@ class AuthService:
         if record is None:
             raise AuthenticationError("Invalid or expired verification link.")
         if record.expires_at < datetime.now(UTC):
-            raise AuthenticationError("Verification link has expired. Register again or request a new link.")
+            raise AuthenticationError(
+                "Verification link has expired. Register again or request a new link."
+            )
         user = self.users.get(record.user_id)
         if user is None:
             raise AuthenticationError("Account not found.")

@@ -5,12 +5,12 @@ from __future__ import annotations
 from fastapi import APIRouter, status
 
 from app.api.deps import CurrentAdmin, DbSession
+from app.core.exceptions import NotFoundError
 from app.schemas.model_lifecycle import (
     ModelVersionResponse,
     TrainingJobCreate,
     TrainingJobResponse,
 )
-from app.core.exceptions import NotFoundError
 from app.services.model_lifecycle_service import ModelLifecycleService
 
 router = APIRouter(

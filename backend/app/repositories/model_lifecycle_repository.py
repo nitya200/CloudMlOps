@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import uuid
-
 from sqlalchemy import func, select
 
-from app.models import ModelVersion, ModelVersionStatus, TrainingJob, TrainingJobStatus
+from app.models import ModelVersion, ModelVersionStatus, TrainingJob
 from app.repositories.base import BaseRepository
 
 

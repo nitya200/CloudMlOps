@@ -13,9 +13,10 @@ logger = get_logger(__name__)
 
 def send_verification_email(*, to_email: str, verify_url: str) -> None:
     subject = "Verify your CloudMLOps account"
+    hours = settings.email_verification_expire_hours
     body = (
         "Welcome to CloudMLOps.\n\n"
-        f"Open this link to verify your email (expires in {settings.email_verification_expire_hours} hours):\n"
+        f"Open this link to verify your email (expires in {hours} hours):\n"
         f"{verify_url}\n"
     )
     if not settings.smtp_host:

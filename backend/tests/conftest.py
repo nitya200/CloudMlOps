@@ -33,8 +33,8 @@ os.environ.update(
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from app.ai.base import SummarizationOutput, Summarizer  # noqa: E402
 from app.ai import factory as ai_factory  # noqa: E402
+from app.ai.base import SummarizationOutput, Summarizer  # noqa: E402
 from app.ai.factory import create_summarizer as _create_summarizer_real  # noqa: E402
 from app.ai.factory import get_summarizer, set_summarizer  # noqa: E402
 from app.ai.prompts import SummaryLengthStrategy  # noqa: E402

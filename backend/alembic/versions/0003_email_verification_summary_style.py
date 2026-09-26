@@ -31,9 +31,13 @@ def upgrade() -> None:
         sa.Column("user_id", GUID(), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
         sa.Column("token_hash", sa.String(64), nullable=False, unique=True),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
+        ),
     )
-    op.create_index("ix_email_verification_tokens_user_id", "email_verification_tokens", ["user_id"])
+    op.create_index(
+        "ix_email_verification_tokens_user_id", "email_verification_tokens", ["user_id"]
+    )
     op.add_column(
         "summary_requests",
         sa.Column(

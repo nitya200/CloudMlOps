@@ -7,8 +7,8 @@ import uuid
 
 from sqlalchemy.orm import Session
 
-from app.ai.base import Summarizer
 from app.ai import factory as ai_factory
+from app.ai.base import Summarizer
 from app.ai.factory import get_summarizer
 from app.ai.prompts import SummaryStrategyFactory
 from app.core.exceptions import NotFoundError, ValidationError
@@ -139,9 +139,7 @@ class SummarizationService:
     # ---- internals --------------------------------------------------------
     def _run(self, user: User, request: SummaryRequest, metric_type: MetricType) -> Summary:
         strategy = SummaryStrategyFactory.create(request.summary_length)
-        backend = (
-            "flan-t5" if request.summary_style == SummaryStyle.ABSTRACTIVE else "extractive"
-        )
+        backend = "flan-t5" if request.summary_style == SummaryStyle.ABSTRACTIVE else "extractive"
         summarizer = ai_factory.create_summarizer(backend)
         started = time.perf_counter()
         try:

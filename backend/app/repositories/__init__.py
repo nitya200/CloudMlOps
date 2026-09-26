@@ -17,9 +17,9 @@ __all__ = [
     "FeedbackRepository",
     "MetricRepository",
     "ModelVersionRepository",
-    "TrainingJobRepository",
     "SessionRepository",
     "SummaryRepository",
     "SummaryRequestRepository",
+    "TrainingJobRepository",
     "UserRepository",
 ]

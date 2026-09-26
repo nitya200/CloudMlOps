@@ -9,8 +9,8 @@ from sqlalchemy import Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import (
-    Base,
     GUID,
+    Base,
     TimestampMixin,
     UUIDPrimaryKeyMixin,
     enum_column,
@@ -39,7 +39,7 @@ class ModelVersion(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         GUID(), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
 
-    training_jobs: Mapped[list["TrainingJob"]] = relationship(
+    training_jobs: Mapped[list[TrainingJob]] = relationship(
         "TrainingJob", back_populates="model_version"
     )
 

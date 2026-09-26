@@ -85,9 +85,7 @@ class ModelLifecycleService:
             ModelVersionStatus.PENDING_APPROVAL,
             ModelVersionStatus.ACTIVE,
         ):
-            raise ConflictError(
-                "Only approved or pending versions can be promoted to production."
-            )
+            raise ConflictError("Only approved or pending versions can be promoted to production.")
         self.versions.retire_active()
         version.status = ModelVersionStatus.ACTIVE
         version.promoted_at = datetime.now(UTC)

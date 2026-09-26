@@ -17,8 +17,8 @@ from app.models.enums import (
     TrainingJobStatus,
     UserRole,
 )
-from app.models.model_version import ModelVersion, TrainingJob
 from app.models.feedback import FeedbackRecord
+from app.models.model_version import ModelVersion, TrainingJob
 from app.models.session import Session
 from app.models.summary import Summary
 from app.models.summary_request import SummaryRequest
@@ -35,16 +35,16 @@ __all__ = [
     "MetricType",
     "ModelVersion",
     "ModelVersionStatus",
-    "TrainingJob",
-    "TrainingJobStatus",
     "RequestStatus",
     "Session",
     "SourceType",
     "Summary",
     "SummaryLength",
-    "SummaryStyle",
     "SummaryRequest",
+    "SummaryStyle",
     "TimestampMixin",
+    "TrainingJob",
+    "TrainingJobStatus",
     "UUIDPrimaryKeyMixin",
     "UsageMetric",
     "User",

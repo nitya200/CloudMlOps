@@ -16,8 +16,9 @@ EVALUATION_SAMPLES: tuple[EvaluationSample, ...] = (
         source_text=(
             "Cloud computing lets teams deploy web applications without buying physical servers. "
             "Containers package the application and its dependencies so the same image runs in "
-            "development and production. Continuous integration runs automated tests on every change, "
-            "and continuous delivery publishes approved builds to managed platforms such as AWS App Runner."
+            "development and production. Continuous integration runs automated tests on "
+            "every change, and continuous delivery publishes approved builds to managed "
+            "platforms such as AWS App Runner."
         ),
         reference_summary=(
             "Cloud platforms and containers help teams ship web apps without owning hardware, "
@@ -29,7 +30,8 @@ EVALUATION_SAMPLES: tuple[EvaluationSample, ...] = (
             "Abstractive summarization models generate new sentences rather than copying phrases "
             "from the source document. FLAN-T5-small is an instruction-tuned seq2seq model that "
             "works well for short inputs but needs chunking for long reports. Administrators track "
-            "quality with user ratings and offline ROUGE scores before promoting a new model version."
+            "quality with user ratings and offline ROUGE scores before promoting a new "
+            "model version."
         ),
         reference_summary=(
             "Abstractive models like FLAN-T5 rewrite documents in new words; long inputs require "
@@ -38,7 +40,8 @@ EVALUATION_SAMPLES: tuple[EvaluationSample, ...] = (
     ),
     EvaluationSample(
         source_text=(
-            "PostgreSQL stores users, documents, summary requests, and feedback in normalized tables. "
+            "PostgreSQL stores users, documents, summary requests, and feedback in "
+            "normalized tables. "
             "Alembic migrations version the schema so production databases evolve safely. "
             "Secrets such as database URLs and JWT signing keys live in AWS Secrets Manager rather "
             "than in source control."
