@@ -10,7 +10,6 @@ export const summaryService = {
     form.append('file', file);
     return api
       .post('/api/documents/upload', form, {
-        headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (event) => {
           if (onProgress && event.total) {
             onProgress(Math.round((event.loaded * 100) / event.total));

@@ -10,6 +10,11 @@ import SummaryLengthPicker from '../components/SummaryLengthPicker.jsx';
 import TextInput from '../components/TextInput.jsx';
 import { readError } from '../services/api.js';
 import summaryService from '../services/summaryService.js';
+import {
+  CLOUD_SUMMARIZE_HINT,
+  isHeavyCloudSummarize,
+  isProductionCloudHost,
+} from '../utils/deployment.js';
 import { formatNumber, formatPercent, formatSeconds } from '../utils/format.js';
 
 const MIN_CHARS = 200;
@@ -30,13 +35,19 @@ export default function Summarize() {
   const [result, setResult] = useState(null);
   const [rating, setRating] = useState(0);
   const [notice, setNotice] = useState('');
+  const [offerFastRetry, setOfferFastRetry] = useState(false);
+  const onCloud = isProductionCloudHost();
 
   useEffect(() => {
     summaryService
       .options()
       .then((loaded) => {
         setOptions(loaded);
-        if (loaded?.backend === 'flan-t5' || loaded?.flan_t5_available) {
+        // Local Docker can default to abstractive; cloud must stay concise to avoid 120s cutoffs.
+        if (
+          !onCloud &&
+          (loaded?.backend === 'flan-t5' || loaded?.flan_t5_available)
+        ) {
           setStyle('abstractive');
         }
       })
@@ -51,20 +62,16 @@ export default function Summarize() {
   const canSubmit =
     mode === 'text' ? text.trim().length >= MIN_CHARS : Boolean(file);
 
-  const handleGenerate = async (event) => {
-    event.preventDefault();
-    setError('');
-    setNotice('');
-    setResult(null);
-    setRating(0);
-
+  const runSummarize = async (overrides = {}) => {
+    const effectiveLength = overrides.length ?? length;
+    const effectiveStyle = overrides.style ?? style;
     try {
       if (mode === 'text') {
         setStatus('generating');
         const summary = await summaryService.summarizeText({
           text: text.trim(),
-          summary_length: length,
-          summary_style: style,
+          summary_length: effectiveLength,
+          summary_style: effectiveStyle,
           title: title.trim() || null,
         });
         setResult(summary);
@@ -74,8 +81,8 @@ export default function Summarize() {
         const document = await summaryService.uploadDocument(file, setProgress);
         setStatus('generating');
         const summary = await summaryService.summarizeDocument(document.id, {
-          summary_length: length,
-          summary_style: style,
+          summary_length: effectiveLength,
+          summary_style: effectiveStyle,
           title: title.trim() || document.filename,
         });
         setResult({ ...summary, source_filename: document.filename });
@@ -84,11 +91,43 @@ export default function Summarize() {
         );
       }
     } catch (requestError) {
-      setError(readError(requestError));
+      const message = readError(requestError);
+      setError(message);
+      setOfferFastRetry(onCloud && (style === 'abstractive' || length === 'long'));
     } finally {
       setStatus('idle');
       setProgress(0);
     }
+  };
+
+  const handleGenerate = async (event) => {
+    event.preventDefault();
+    setError('');
+    setNotice('');
+    setResult(null);
+    setRating(0);
+    setOfferFastRetry(false);
+
+    if (
+      onCloud &&
+      isHeavyCloudSummarize(style, length) &&
+      !window.confirm(
+        'Abstractive summaries on large documents often exceed the cloud 2-minute limit and may fail. Continue anyway, or cancel and switch to Concise with Short/Medium length.',
+      )
+    ) {
+      return;
+    }
+
+    await runSummarize();
+  };
+
+  const handleFastRetry = async () => {
+    setLength('short');
+    setStyle('concise');
+    setError('');
+    setOfferFastRetry(false);
+    setNotice('Retrying with Concise style and Short length (faster on cloud).');
+    await runSummarize({ length: 'short', style: 'concise' });
   };
 
   const handleCopy = async () => {
@@ -193,6 +232,12 @@ export default function Summarize() {
             disabled={busy}
           />
 
+          {onCloud ? (
+            <div className="alert alert--warning fade-in" role="status">
+              <div className="alert__body">{CLOUD_SUMMARIZE_HINT}</div>
+            </div>
+          ) : null}
+
           <div className="card__title">
             <h3>Summary style</h3>
             <span>Concise uses the fast extractive path; Abstractive uses FLAN-T5 when available</span>
@@ -266,6 +311,11 @@ export default function Summarize() {
           </div>
 
           <ErrorMessage message={error} onDismiss={() => setError('')} />
+          {offerFastRetry ? (
+            <button type="button" className="btn btn--primary btn--block" onClick={handleFastRetry}>
+              Retry with Concise + Short (recommended on cloud)
+            </button>
+          ) : null}
           <ErrorMessage message={notice} variant="success" onDismiss={() => setNotice('')} />
 
           {busy ? (
@@ -276,8 +326,9 @@ export default function Summarize() {
                   {status === 'uploading' ? 'Uploading and extracting text' : 'Summarizing'}
                 </strong>
                 <p className="loading-block__hint">
-                  Long documents are split into chunks, summarized separately and then merged. On
-                  CPU this can take up to a couple of minutes.
+                  {onCloud
+                    ? 'Cloud hosting allows about 2 minutes per request. Concise + Short/Medium is most reliable on phones and large PDFs.'
+                    : 'Long documents are split into chunks, summarized separately and then merged. On CPU this can take several minutes locally.'}
                 </p>
               </div>
             </div>

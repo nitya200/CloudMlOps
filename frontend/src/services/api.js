@@ -44,6 +44,11 @@ export function setUnauthorizedHandler(handler) {
 api.interceptors.request.use((config) => {
   const token = getStoredToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
+  // Default instance header is application/json; FormData must set multipart boundary
+  // automatically or uploads fail (especially on mobile Safari).
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
   return config;
 });
 
@@ -71,9 +76,17 @@ export function readError(error, fallback = 'Something went wrong. Please try ag
   if (error?.code === 'ECONNABORTED') {
     return 'The request timed out. Try a shorter document or a shorter summary length.';
   }
-  if (error?.message === 'Network Error') {
-    if (baseURL.includes('awsapprunner.com')) {
-      return 'The request was interrupted (AWS limits responses to 2 minutes). Use a shorter document or try again.';
+  if (error?.message === 'Network Error' || error?.code === 'ERR_NETWORK') {
+    const onCloud =
+      baseURL.includes('awsapprunner.com') ||
+      baseURL.includes('onrender.com') ||
+      (typeof window !== 'undefined' &&
+        /awsapprunner\.com|netlify\.app|onrender\.com/.test(window.location.hostname));
+    if (onCloud) {
+      return (
+        'The request was interrupted (cloud hosts limit responses to about 2 minutes, or the ' +
+        'connection dropped). Try Concise style, Short/Medium length, a smaller document, or Wi‑Fi instead of mobile data.'
+      );
     }
     if (baseURL) {
       return 'Could not reach the API server. Check your connection and try again.';
